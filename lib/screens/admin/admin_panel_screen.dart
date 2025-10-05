@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/chatbot_provider.dart';
+import '../../models/issue_model.dart';
 
 class AdminPanelScreen extends StatelessWidget {
   const AdminPanelScreen({Key? key}) : super(key: key);
@@ -90,6 +93,12 @@ class _UsersTab extends StatelessWidget {
                       Text(
                         'No users yet',
                         style: TextStyle(fontSize: 18, color: Colors.grey[600]),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () => _showAddUserDialog(context),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add First User'),
                       ),
                     ],
                   ),
@@ -264,27 +273,31 @@ class _UserCard extends StatelessWidget {
             ),
           ],
         ),
-        trailing: PopupMenuButton(
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'edit',
-              child: ListTile(
-                leading: Icon(Icons.edit),
-                title: Text('Edit'),
-                contentPadding: EdgeInsets.zero,
+        trailing: IconButton(
+          icon: const Icon(Icons.delete, color: Colors.red),
+          onPressed: () async {
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Delete User'),
+                content:
+                    const Text('Are you sure you want to delete this user?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style:
+                        ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    child: const Text('Delete'),
+                  ),
+                ],
               ),
-            ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: ListTile(
-                leading: Icon(Icons.delete, color: Colors.red),
-                title: Text('Delete', style: TextStyle(color: Colors.red)),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ],
-          onSelected: (value) async {
-            if (value == 'delete') {
+            );
+
+            if (confirm == true && context.mounted) {
               await FirebaseFirestore.instance
                   .collection('users')
                   .doc(userId)
@@ -352,6 +365,12 @@ class _TeamsTab extends StatelessWidget {
                         'No teams created yet',
                         style: TextStyle(fontSize: 18, color: Colors.grey[600]),
                       ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () => _showAddTeamDialog(context),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Create First Team'),
+                      ),
                     ],
                   ),
                 );
@@ -410,14 +429,23 @@ class _TeamsTab extends StatelessWidget {
           ElevatedButton(
             onPressed: () async {
               if (nameController.text.isNotEmpty) {
+                final auth = context.read<AuthProvider>();
                 await FirebaseFirestore.instance.collection('teams').add({
                   'name': nameController.text,
                   'description': descController.text,
-                  'leaderId': '',
+                  'leaderId': auth.currentUser?.uid ?? '',
                   'memberIds': [],
                   'createdAt': DateTime.now().toIso8601String(),
                 });
-                if (context.mounted) Navigator.pop(context);
+                if (context.mounted) {
+                  Navigator.pop(context);
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Team created successfully'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
               }
             },
             child: const Text('Create'),
@@ -467,39 +495,40 @@ class _TeamCard extends StatelessWidget {
             ),
           ],
         ),
-        trailing: PopupMenuButton(
-          itemBuilder: (context) => [
-            const PopupMenuItem(
-              value: 'members',
-              child: ListTile(
-                leading: Icon(Icons.people),
-                title: Text('Manage Members'),
-                contentPadding: EdgeInsets.zero,
+        trailing: IconButton(
+          icon: const Icon(Icons.delete, color: Colors.red),
+          onPressed: () async {
+            final confirm = await showDialog<bool>(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Delete Team'),
+                content:
+                    const Text('Are you sure you want to delete this team?'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(context, false),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(context, true),
+                    style:
+                        ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    child: const Text('Delete'),
+                  ),
+                ],
               ),
-            ),
-            const PopupMenuItem(
-              value: 'edit',
-              child: ListTile(
-                leading: Icon(Icons.edit),
-                title: Text('Edit'),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-            const PopupMenuItem(
-              value: 'delete',
-              child: ListTile(
-                leading: Icon(Icons.delete, color: Colors.red),
-                title: Text('Delete', style: TextStyle(color: Colors.red)),
-                contentPadding: EdgeInsets.zero,
-              ),
-            ),
-          ],
-          onSelected: (value) async {
-            if (value == 'delete') {
+            );
+
+            if (confirm == true && context.mounted) {
               await FirebaseFirestore.instance
                   .collection('teams')
                   .doc(teamId)
                   .delete();
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Team deleted')),
+                );
+              }
             }
           },
         ),
@@ -557,6 +586,15 @@ class _ChatbotTab extends StatelessWidget {
                       Text(
                         'Add responses to train the chatbot',
                         style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                      ),
+                      const SizedBox(height: 16),
+                      ElevatedButton.icon(
+                        onPressed: () => _showAddResponseDialog(context),
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add First Response'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF10B981),
+                        ),
                       ),
                     ],
                   ),
@@ -672,9 +710,9 @@ class _BotResponseCard extends StatelessWidget {
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: const BorderRadius.only(
+            decoration: const BoxDecoration(
+              color: Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.only(
                 bottomLeft: Radius.circular(16),
                 bottomRight: Radius.circular(16),
               ),
@@ -732,13 +770,12 @@ class _IssuesTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final botProvider = context.watch<ChatbotProvider>();
-    final auth = context.watch<AuthProvider>();
 
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: const Text(
+        const Padding(
+          padding: EdgeInsets.all(16),
+          child: Text(
             'Pending Issues',
             style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
           ),

@@ -85,4 +85,5 @@ class DefaultFirebaseOptions {
     storageBucket: 'work-connect-5d5a8.firebasestorage.app',
     measurementId: 'G-JFHSC6LC8N',
   );
+
 }

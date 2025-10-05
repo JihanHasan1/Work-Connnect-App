@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import '../../providers/auth_provider.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({Key? key}) : super(key: key);
@@ -15,6 +16,13 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   bool _isLoading = false;
   bool _obscurePassword = true;
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
 
   Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
@@ -33,6 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
           const SnackBar(
             content: Text('Login successful!'),
             backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
           ),
         );
       }
@@ -42,6 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
           SnackBar(
             content: Text(e.toString()),
             backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -56,14 +66,14 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Container(
-        decoration: BoxDecoration(
+        decoration: const BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              const Color(0xFF6366F1),
-              const Color(0xFF8B5CF6),
-              const Color(0xFFA855F7),
+              Color(0xFF6366F1),
+              Color(0xFF8B5CF6),
+              Color(0xFFA855F7),
             ],
           ),
         ),
@@ -92,7 +102,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ],
                       ),
                       child: const Icon(
-                        FontAwesomeIcons.warehouse,
+                        FontAwesomeIcons.briefcase,
                         size: 50,
                         color: Color(0xFF6366F1),
                       ),
@@ -101,7 +111,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
                     // Title
                     const Text(
-                      'Warehouse Connect',
+                      'Work-Connect',
                       style: TextStyle(
                         fontSize: 32,
                         fontWeight: FontWeight.bold,
@@ -110,11 +120,12 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     const SizedBox(height: 8),
                     Text(
-                      'Communication & Issue Management',
+                      'Workplace Communication & Solutions',
                       style: TextStyle(
                         fontSize: 16,
                         color: Colors.white.withOpacity(0.9),
                       ),
+                      textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 48),
 
@@ -152,6 +163,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               labelText: 'Username',
                               prefixIcon: Icon(Icons.person_outline),
                             ),
+                            textInputAction: TextInputAction.next,
+                            enabled: !_isLoading,
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return 'Please enter username';
@@ -175,10 +188,14 @@ class _LoginScreenState extends State<LoginScreen> {
                                       : Icons.visibility_off_outlined,
                                 ),
                                 onPressed: () {
-                                  setState(() => _obscurePassword = !_obscurePassword);
+                                  setState(() =>
+                                      _obscurePassword = !_obscurePassword);
                                 },
                               ),
                             ),
+                            textInputAction: TextInputAction.done,
+                            enabled: !_isLoading,
+                            onFieldSubmitted: (_) => _handleLogin(),
                             validator: (value) {
                               if (value == null || value.isEmpty) {
                                 return 'Please enter password';
@@ -195,6 +212,7 @@ class _LoginScreenState extends State<LoginScreen> {
                               backgroundColor: const Color(0xFF6366F1),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 16),
+                              disabledBackgroundColor: Colors.grey,
                             ),
                             child: _isLoading
                                 ? const SizedBox(
@@ -202,7 +220,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                     width: 20,
                                     child: CircularProgressIndicator(
                                       strokeWidth: 2,
-                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                          Colors.white),
                                     ),
                                   )
                                 : const Text(
@@ -251,388 +270,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
             ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _usernameController.dispose();
-    _passwordController.dispose();
-    super.dispose();
-  }
-}
-
-// screens/home/home_screen.dart
-import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
-import '../chat/team_chat_list_screen.dart';
-import '../faq/faq_screen.dart';
-import '../chatbot/chatbot_screen.dart';
-import '../admin/admin_panel_screen.dart';
-
-class HomeScreen extends StatefulWidget {
-  const HomeScreen({Key? key}) : super(key: key);
-
-  @override
-  State<HomeScreen> createState() => _HomeScreenState();
-}
-
-class _HomeScreenState extends State<HomeScreen> {
-  int _selectedIndex = 0;
-
-  @override
-  Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    
-    final List<Widget> screens = [
-      const DashboardScreen(),
-      const TeamChatListScreen(),
-      const FAQScreen(),
-      const ChatbotScreen(),
-      if (auth.isAdmin) const AdminPanelScreen(),
-    ];
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Work-Connect',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.notifications_outlined),
-            onPressed: () {
-              // TODO: Implement notifications
-            },
-          ),
-          PopupMenuButton(
-            icon: const Icon(Icons.account_circle),
-            itemBuilder: (context) => [
-              PopupMenuItem(
-                child: ListTile(
-                  leading: const Icon(Icons.person),
-                  title: Text(auth.currentUser?.username ?? 'User'),
-                  subtitle: Text(auth.currentUser?.role ?? 'Role'),
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-              const PopupMenuDivider(),
-              PopupMenuItem(
-                child: const ListTile(
-                  leading: Icon(Icons.logout, color: Colors.red),
-                  title: Text('Sign Out', style: TextStyle(color: Colors.red)),
-                  contentPadding: EdgeInsets.zero,
-                ),
-                onTap: () async {
-                  await auth.signOut();
-                },
-              ),
-            ],
-          ),
-        ],
-      ),
-      body: screens[_selectedIndex],
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _selectedIndex,
-        onDestinationSelected: (index) {
-          setState(() => _selectedIndex = index);
-        },
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.dashboard_outlined),
-            selectedIcon: Icon(Icons.dashboard),
-            label: 'Dashboard',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.chat_outlined),
-            selectedIcon: Icon(Icons.chat),
-            label: 'Teams',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.help_outline),
-            selectedIcon: Icon(Icons.help),
-            label: 'FAQ',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.smart_toy_outlined),
-            selectedIcon: Icon(Icons.smart_toy),
-            label: 'Assistant',
-          ),
-          if (auth.isAdmin)
-            const NavigationDestination(
-              icon: Icon(Icons.admin_panel_settings_outlined),
-              selectedIcon: Icon(Icons.admin_panel_settings),
-              label: 'Admin',
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-// screens/home/dashboard_screen.dart
-class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final auth = context.watch<AuthProvider>();
-    
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Welcome Card
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(24),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Welcome back,',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: Colors.white.withOpacity(0.9),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  auth.currentUser?.username ?? 'User',
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    auth.currentUser?.role?.toUpperCase() ?? '',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Quick Actions
-          const Text(
-            'Quick Actions',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            mainAxisSpacing: 16,
-            crossAxisSpacing: 16,
-            childAspectRatio: 1.3,
-            children: [
-              _QuickActionCard(
-                icon: FontAwesomeIcons.users,
-                title: 'Team Chat',
-                subtitle: 'Communicate',
-                color: const Color(0xFF3B82F6),
-                onTap: () {
-                  // Navigate to teams tab
-                },
-              ),
-              _QuickActionCard(
-                icon: FontAwesomeIcons.circleQuestion,
-                title: 'FAQs',
-                subtitle: 'Find Answers',
-                color: const Color(0xFF8B5CF6),
-                onTap: () {
-                  // Navigate to FAQ tab
-                },
-              ),
-              _QuickActionCard(
-                icon: FontAwesomeIcons.robot,
-                title: 'AI Assistant',
-                subtitle: 'Get Help',
-                color: const Color(0xFF10B981),
-                onTap: () {
-                  // Navigate to chatbot tab
-                },
-              ),
-              if (auth.isAdmin)
-                _QuickActionCard(
-                  icon: FontAwesomeIcons.userGear,
-                  title: 'Admin',
-                  subtitle: 'Manage',
-                  color: const Color(0xFFEF4444),
-                  onTap: () {
-                    // Navigate to admin tab
-                  },
-                ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // Recent Activity
-          const Text(
-            'Recent Activity',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF1E293B),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _ActivityCard(
-            icon: Icons.chat_bubble_outline,
-            title: 'New message in Logistics Team',
-            time: '5 minutes ago',
-            color: Colors.blue,
-          ),
-          const SizedBox(height: 12),
-          _ActivityCard(
-            icon: Icons.help_outline,
-            title: 'FAQ updated: Shift Schedules',
-            time: '1 hour ago',
-            color: Colors.purple,
-          ),
-          const SizedBox(height: 12),
-          _ActivityCard(
-            icon: Icons.check_circle_outline,
-            title: 'Issue resolved by Team Leader',
-            time: '2 hours ago',
-            color: Colors.green,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QuickActionCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _QuickActionCard({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(icon, color: color, size: 28),
-              ),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF1E293B),
-                ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ActivityCard extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String time;
-  final Color color;
-
-  const _ActivityCard({
-    required this.icon,
-    required this.title,
-    required this.time,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: ListTile(
-        leading: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, color: color, size: 20),
-        ),
-        title: Text(
-          title,
-          style: const TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-        subtitle: Text(
-          time,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey[600],
           ),
         ),
       ),
