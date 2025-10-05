@@ -86,6 +86,12 @@ class _FAQScreenState extends State<FAQScreen> {
                               onSelected: (selected) {
                                 setState(() => _selectedCategory = null);
                               },
+                              selectedColor: const Color(0xFF6366F1),
+                              labelStyle: TextStyle(
+                                color: _selectedCategory == null
+                                    ? Colors.white
+                                    : const Color(0xFF1E293B),
+                              ),
                             ),
                           );
                         }
@@ -97,9 +103,15 @@ class _FAQScreenState extends State<FAQScreen> {
                             selected: _selectedCategory == category,
                             onSelected: (selected) {
                               setState(() {
-                                _selectedCategory = selected ? category : null);
+                                _selectedCategory = selected ? category : null;
                               });
                             },
+                            selectedColor: const Color(0xFF6366F1),
+                            labelStyle: TextStyle(
+                              color: _selectedCategory == category
+                                  ? Colors.white
+                                  : const Color(0xFF1E293B),
+                            ),
                           ),
                         );
                       },
@@ -139,6 +151,10 @@ class _FAQScreenState extends State<FAQScreen> {
                             onPressed: () => _showAddFAQDialog(context),
                             icon: const Icon(Icons.add),
                             label: const Text('Add First FAQ'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF6366F1),
+                              foregroundColor: Colors.white,
+                            ),
                           ),
                         ],
                       ],
@@ -171,75 +187,110 @@ class _FAQScreenState extends State<FAQScreen> {
     final questionController = TextEditingController();
     final answerController = TextEditingController();
     final categoryController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('Add New FAQ'),
         content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextField(
-                controller: questionController,
-                decoration: const InputDecoration(
-                  labelText: 'Question',
-                  border: OutlineInputBorder(),
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: questionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Question',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.question_answer),
+                  ),
+                  maxLines: 2,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a question';
+                    }
+                    return null;
+                  },
                 ),
-                maxLines: 2,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: answerController,
-                decoration: const InputDecoration(
-                  labelText: 'Answer',
-                  border: OutlineInputBorder(),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: answerController,
+                  decoration: const InputDecoration(
+                    labelText: 'Answer',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.chat_bubble_outline),
+                  ),
+                  maxLines: 4,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter an answer';
+                    }
+                    return null;
+                  },
                 ),
-                maxLines: 4,
-              ),
-              const SizedBox(height: 16),
-              TextField(
-                controller: categoryController,
-                decoration: const InputDecoration(
-                  labelText: 'Category',
-                  border: OutlineInputBorder(),
-                  hintText: 'e.g., General, HR, IT',
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: categoryController,
+                  decoration: const InputDecoration(
+                    labelText: 'Category',
+                    border: OutlineInputBorder(),
+                    hintText: 'e.g., General, HR, IT',
+                    prefixIcon: Icon(Icons.category),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
-              if (questionController.text.isNotEmpty &&
-                  answerController.text.isNotEmpty) {
-                final faq = FAQModel(
-                  id: DateTime.now().millisecondsSinceEpoch.toString(),
-                  question: questionController.text,
-                  answer: answerController.text,
-                  category: categoryController.text.isEmpty
-                      ? 'General'
-                      : categoryController.text,
-                  createdAt: DateTime.now(),
-                  updatedAt: DateTime.now(),
-                );
-                await context.read<FAQProvider>().addFAQ(faq);
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('FAQ added successfully'),
-                      backgroundColor: Colors.green,
-                    ),
+              if (formKey.currentState!.validate()) {
+                try {
+                  final faq = FAQModel(
+                    id: DateTime.now().millisecondsSinceEpoch.toString(),
+                    question: questionController.text.trim(),
+                    answer: answerController.text.trim(),
+                    category: categoryController.text.trim().isEmpty
+                        ? 'General'
+                        : categoryController.text.trim(),
+                    createdAt: DateTime.now(),
+                    updatedAt: DateTime.now(),
                   );
+
+                  await context.read<FAQProvider>().addFAQ(faq);
+
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('FAQ added successfully'),
+                        backgroundColor: Colors.green,
+                      ),
+                    );
+                  }
+                } catch (e) {
+                  if (dialogContext.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 }
               }
             },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF6366F1),
+              foregroundColor: Colors.white,
+            ),
             child: const Text('Add'),
           ),
         ],
@@ -401,14 +452,27 @@ class _FAQCardState extends State<_FAQCard> {
                             );
 
                             if (confirm == true && context.mounted) {
-                              await context
-                                  .read<FAQProvider>()
-                                  .deleteFAQ(widget.faq.id);
-                              if (context.mounted) {
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  const SnackBar(
-                                      content: Text('FAQ deleted')),
-                                );
+                              try {
+                                await context
+                                    .read<FAQProvider>()
+                                    .deleteFAQ(widget.faq.id);
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('FAQ deleted successfully'),
+                                      backgroundColor: Colors.green,
+                                    ),
+                                  );
+                                }
+                              } catch (e) {
+                                if (context.mounted) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Error: ${e.toString()}'),
+                                      backgroundColor: Colors.red,
+                                    ),
+                                  );
+                                }
                               }
                             }
                           },

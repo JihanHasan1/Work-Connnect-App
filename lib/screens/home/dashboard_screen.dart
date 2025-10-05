@@ -1,3 +1,8 @@
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import '../../providers/auth_provider.dart';
+
 class DashboardScreen extends StatelessWidget {
   const DashboardScreen({Key? key}) : super(key: key);
 
@@ -32,7 +37,9 @@ class DashboardScreen extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  auth.currentUser?.username ?? 'User',
+                  auth.currentUser?.displayName ??
+                      auth.currentUser?.username ??
+                      'User',
                   style: const TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
@@ -48,7 +55,10 @@ class DashboardScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    auth.currentUser?.role?.toUpperCase() ?? '',
+                    auth.currentUser?.role
+                            ?.toUpperCase()
+                            .replaceAll('_', ' ') ??
+                        '',
                     style: const TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w600,
@@ -86,7 +96,8 @@ class DashboardScreen extends StatelessWidget {
                 subtitle: 'Communicate',
                 color: const Color(0xFF3B82F6),
                 onTap: () {
-                  // Navigate to teams tab
+                  // Navigate to teams tab (index 1)
+                  DefaultTabController.of(context).animateTo(1);
                 },
               ),
               _QuickActionCard(
@@ -95,7 +106,8 @@ class DashboardScreen extends StatelessWidget {
                 subtitle: 'Find Answers',
                 color: const Color(0xFF8B5CF6),
                 onTap: () {
-                  // Navigate to FAQ tab
+                  // Navigate to FAQ tab (index 2)
+                  DefaultTabController.of(context).animateTo(2);
                 },
               ),
               _QuickActionCard(
@@ -104,7 +116,8 @@ class DashboardScreen extends StatelessWidget {
                 subtitle: 'Get Help',
                 color: const Color(0xFF10B981),
                 onTap: () {
-                  // Navigate to chatbot tab
+                  // Navigate to chatbot tab (index 3)
+                  DefaultTabController.of(context).animateTo(3);
                 },
               ),
               if (auth.isAdmin)
@@ -114,7 +127,8 @@ class DashboardScreen extends StatelessWidget {
                   subtitle: 'Manage',
                   color: const Color(0xFFEF4444),
                   onTap: () {
-                    // Navigate to admin tab
+                    // Navigate to admin tab (index 4)
+                    DefaultTabController.of(context).animateTo(4);
                   },
                 ),
             ],
@@ -134,14 +148,14 @@ class DashboardScreen extends StatelessWidget {
 
           _ActivityCard(
             icon: Icons.chat_bubble_outline,
-            title: 'New message in Logistics Team',
+            title: 'New message in Team Chat',
             time: '5 minutes ago',
             color: Colors.blue,
           ),
           const SizedBox(height: 12),
           _ActivityCard(
             icon: Icons.help_outline,
-            title: 'FAQ updated: Shift Schedules',
+            title: 'FAQ updated: Company Policies',
             time: '1 hour ago',
             color: Colors.purple,
           ),
