@@ -18,14 +18,6 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _obscurePassword = true;
 
   @override
-  void initState() {
-    super.initState();
-    // Pre-fill admin credentials for testing
-    _usernameController.text = 'admin';
-    _passwordController.text = 'admin';
-  }
-
-  @override
   void dispose() {
     _usernameController.dispose();
     _passwordController.dispose();
@@ -33,44 +25,31 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
-    debugPrint('🔐 Login button pressed');
-
-    if (!_formKey.currentState!.validate()) {
-      debugPrint('❌ Form validation failed');
-      return;
-    }
-
-    final username = _usernameController.text.trim();
-    final password = _passwordController.text;
-
-    debugPrint('📝 Username entered: "$username"');
-    debugPrint(
-        '📝 Password entered: "${password.replaceAll(RegExp(r'.'), '*')}"');
+    if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      debugPrint('🚀 Calling auth.signIn...');
       final auth = context.read<AuthProvider>();
-      final success = await auth.signIn(username, password);
-
-      debugPrint('✅ Sign in result: $success');
+      final success = await auth.signIn(
+        _usernameController.text.trim(),
+        _passwordController.text,
+      );
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Welcome ${auth.currentUser?.username ?? 'User'}!'),
+          const SnackBar(
+            content: Text('Login successful!'),
             backgroundColor: Colors.green,
-            duration: const Duration(seconds: 2),
+            duration: Duration(seconds: 2),
           ),
         );
       }
     } catch (e) {
-      debugPrint('❌ Login error: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Login failed: ${e.toString()}'),
+            content: Text(e.toString()),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
           ),
@@ -265,31 +244,20 @@ class _LoginScreenState extends State<LoginScreen> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Row(
-                                  children: [
-                                    const Icon(
-                                      Icons.info_outline,
-                                      size: 16,
-                                      color: Color(0xFF6366F1),
-                                    ),
-                                    const SizedBox(width: 8),
-                                    const Text(
-                                      'Demo Credentials (Pre-filled):',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w600,
-                                        color: Color(0xFF64748B),
-                                      ),
-                                    ),
-                                  ],
+                                const Text(
+                                  'Demo Credentials:',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: Color(0xFF64748B),
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  'Username: admin\nPassword: admin',
+                                  'Admin: admin / admin',
                                   style: TextStyle(
                                     fontSize: 12,
                                     color: Colors.grey[700],
-                                    fontFamily: 'monospace',
                                   ),
                                 ),
                               ],

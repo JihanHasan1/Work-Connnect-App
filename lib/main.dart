@@ -12,7 +12,6 @@ import 'screens/home/home_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase with proper error handling
   try {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
@@ -48,22 +47,27 @@ class WorkConnectApp extends StatelessWidget {
           ),
           fontFamily: 'Inter',
           scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+
+          // AppBar Theme
           appBarTheme: const AppBarTheme(
             centerTitle: true,
             elevation: 0,
             backgroundColor: Colors.white,
             foregroundColor: Color(0xFF1E293B),
-            iconTheme: IconThemeData(
-              color: Color(0xFF1E293B),
-            ),
+            iconTheme: IconThemeData(color: Color(0xFF1E293B)),
           ),
+
+          // Card Theme - FIXED
           cardTheme: const CardThemeData(
             elevation: 0,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.all(Radius.circular(16)),
             ),
             color: Colors.white,
+            margin: EdgeInsets.zero,
           ),
+
+          // Input Decoration Theme
           inputDecorationTheme: InputDecorationTheme(
             filled: true,
             fillColor: Colors.white,
@@ -81,7 +85,7 @@ class WorkConnectApp extends StatelessWidget {
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.red, width: 1),
+              borderSide: const BorderSide(color: Colors.red),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
@@ -89,9 +93,11 @@ class WorkConnectApp extends StatelessWidget {
             ),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            prefixIconColor: const Color(0xFF64748B),
-            suffixIconColor: const Color(0xFF64748B),
+            prefixIconColor: Color(0xFF64748B),
+            suffixIconColor: Color(0xFF64748B),
           ),
+
+          // Button Themes
           elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(
               elevation: 0,
@@ -103,17 +109,22 @@ class WorkConnectApp extends StatelessWidget {
               foregroundColor: Colors.white,
             ),
           ),
+
           textButtonTheme: TextButtonThemeData(
             style: TextButton.styleFrom(
               foregroundColor: const Color(0xFF6366F1),
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             ),
           ),
+
+          // FAB Theme
           floatingActionButtonTheme: const FloatingActionButtonThemeData(
             backgroundColor: Color(0xFF6366F1),
             foregroundColor: Colors.white,
             elevation: 2,
           ),
+
+          // Chip Theme
           chipTheme: ChipThemeData(
             backgroundColor: const Color(0xFFF1F5F9),
             selectedColor: const Color(0xFF6366F1),
@@ -126,10 +137,14 @@ class WorkConnectApp extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
           ),
+
+          // Divider Theme
           dividerTheme: const DividerThemeData(
             color: Color(0xFFE2E8F0),
             thickness: 1,
           ),
+
+          // Progress Indicator Theme
           progressIndicatorTheme: const ProgressIndicatorThemeData(
             color: Color(0xFF6366F1),
           ),
@@ -185,7 +200,6 @@ class AuthWrapper extends StatelessWidget {
                         fontSize: 24,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
-                        fontFamily: 'Inter',
                       ),
                     ),
                     const SizedBox(height: 48),

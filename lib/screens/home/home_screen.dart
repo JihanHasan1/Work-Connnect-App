@@ -6,6 +6,8 @@ import '../chat/team_chat_list_screen.dart';
 import '../faq/faq_screen.dart';
 import '../chatbot/chatbot_screen.dart';
 import '../admin/admin_panel_screen.dart';
+import '../profile/profile_screen.dart';
+import '../settings/settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -76,19 +78,13 @@ class _HomeScreenState extends State<HomeScreen>
               icon: const Icon(Icons.account_circle),
               onSelected: (value) async {
                 if (value == 'profile') {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Profile page coming soon!'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
+                  Navigator.push(context,
+                      MaterialPageRoute(builder: (_) => const ProfileScreen()));
                 } else if (value == 'settings') {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Settings page coming soon!'),
-                      duration: Duration(seconds: 2),
-                    ),
-                  );
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (_) => const SettingsScreen()));
                 } else if (value == 'logout') {
                   final confirm = await showDialog<bool>(
                     context: context,
