@@ -63,7 +63,8 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
 
       debugPrint('🔐 Attempting login...');
-      debugPrint('Username: $username');
+      debugPrint('Username entered: $username');
+      debugPrint('Password length: ${password.length}');
 
       // CASE SENSITIVE ADMIN LOGIN
       if (username == 'admin' && password == 'admin') {
@@ -104,13 +105,13 @@ class AuthProvider extends ChangeNotifier {
           .get();
 
       if (userQuery.docs.isEmpty) {
-        debugPrint('❌ Username not found in Firestore');
+        debugPrint('❌ Username not found in Firestore: $username');
         _isLoading = false;
         notifyListeners();
         return {
           'success': false,
-          'field': 'credentials',
-          'message': 'Invalid username or password'
+          'field': 'username',
+          'message': 'Username not found. Please check your username.'
         };
       }
 
@@ -119,16 +120,20 @@ class AuthProvider extends ChangeNotifier {
       final userId = userData.id;
 
       debugPrint('✅ User found in Firestore with ID: $userId');
+      debugPrint('Stored password length: ${storedPassword.toString().length}');
 
       // CASE SENSITIVE PASSWORD CHECK
       if (storedPassword != password) {
         debugPrint('❌ Password incorrect');
+        debugPrint(
+            'Expected password length: ${storedPassword.toString().length}');
+        debugPrint('Provided password length: ${password.length}');
         _isLoading = false;
         notifyListeners();
         return {
           'success': false,
-          'field': 'credentials',
-          'message': 'Invalid username or password'
+          'field': 'password',
+          'message': 'Incorrect password. Please try again.'
         };
       }
 
@@ -161,7 +166,7 @@ class AuthProvider extends ChangeNotifier {
       return {
         'success': false,
         'field': 'general',
-        'message': 'An error occurred: ${e.toString()}'
+        'message': 'Login failed. Please try again.'
       };
     }
   }

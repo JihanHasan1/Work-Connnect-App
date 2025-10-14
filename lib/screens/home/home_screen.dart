@@ -36,6 +36,14 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
+  // Method to navigate to specific tab - used by dashboard
+  void navigateToTab(int index) {
+    setState(() {
+      _selectedIndex = index;
+      _tabController.animateTo(index);
+    });
+  }
+
   @override
   void dispose() {
     _tabController.dispose();
@@ -47,7 +55,8 @@ class _HomeScreenState extends State<HomeScreen>
     final auth = context.watch<AuthProvider>();
 
     final List<Widget> screens = [
-      const DashboardScreen(),
+      DashboardScreen(
+          onNavigateToTab: navigateToTab), // Pass navigation callback
       const TeamChatListScreen(),
       const FAQScreen(),
       const ChatbotScreen(),
@@ -182,10 +191,7 @@ class _HomeScreenState extends State<HomeScreen>
         bottomNavigationBar: NavigationBar(
           selectedIndex: _selectedIndex,
           onDestinationSelected: (index) {
-            setState(() {
-              _selectedIndex = index;
-              _tabController.animateTo(index);
-            });
+            navigateToTab(index);
           },
           destinations: [
             const NavigationDestination(
@@ -206,7 +212,7 @@ class _HomeScreenState extends State<HomeScreen>
             const NavigationDestination(
               icon: Icon(Icons.smart_toy_outlined),
               selectedIcon: Icon(Icons.smart_toy),
-              label: 'ChatBot', // Changed from 'Assistant'
+              label: 'ChatBot',
             ),
             if (auth.isAdmin)
               const NavigationDestination(

@@ -17,7 +17,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
-  String? _credentialsError;
+  String? _errorMessage;
 
   @override
   void dispose() {
@@ -27,24 +27,38 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    debugPrint('🔐 Login button pressed');
+
     // Clear previous errors
     setState(() {
-      _credentialsError = null;
+      _errorMessage = null;
     });
 
-    if (!_formKey.currentState!.validate()) return;
+    if (!_formKey.currentState!.validate()) {
+      debugPrint('❌ Form validation failed');
+      return;
+    }
 
     setState(() => _isLoading = true);
+    debugPrint('⏳ Loading started');
 
     try {
       final auth = context.read<AuthProvider>();
+      debugPrint('📝 Username: ${_usernameController.text}');
+      debugPrint('📝 Password length: ${_passwordController.text.length}');
+
       final result = await auth.signIn(
         _usernameController.text,
         _passwordController.text,
       );
 
+      debugPrint('📊 Result: $result');
+
       if (mounted) {
-        if (result['success']) {
+        setState(() => _isLoading = false);
+
+        if (result['success'] == true) {
+          debugPrint('✅ Login successful');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Login successful!'),
@@ -53,35 +67,45 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           );
         } else {
-          // Display generic error message
-          if (result['field'] == 'credentials') {
-            setState(() {
-              _credentialsError = result['message'];
-            });
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(result['message']),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 3),
+          // Display error message
+          final errorMsg = result['message'] ?? 'Invalid username or password';
+          debugPrint('❌ Login failed: $errorMsg');
+
+          setState(() {
+            _errorMessage = errorMsg;
+          });
+
+          // Also show SnackBar for immediate feedback
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Row(
+                children: [
+                  const Icon(Icons.error_outline, color: Colors.white),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text(errorMsg)),
+                ],
               ),
-            );
-          }
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
         }
       }
     } catch (e) {
+      debugPrint('💥 Exception during login: $e');
       if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'An error occurred. Please try again.';
+        });
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(e.toString()),
+            content: Text('Error: ${e.toString()}'),
             backgroundColor: Colors.red,
             duration: const Duration(seconds: 3),
           ),
         );
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
       }
     }
   }
@@ -180,29 +204,34 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 24),
 
-                          // Error Message (if any)
-                          if (_credentialsError != null)
+                          // Error Message Banner (if any)
+                          if (_errorMessage != null)
                             Container(
-                              padding: const EdgeInsets.all(12),
+                              padding: const EdgeInsets.all(16),
                               margin: const EdgeInsets.only(bottom: 16),
                               decoration: BoxDecoration(
                                 color: Colors.red.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(8),
+                                borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                    color: Colors.red.withOpacity(0.3)),
+                                  color: Colors.red.withOpacity(0.5),
+                                  width: 1.5,
+                                ),
                               ),
                               child: Row(
                                 children: [
-                                  const Icon(Icons.error_outline,
-                                      color: Colors.red, size: 20),
-                                  const SizedBox(width: 8),
+                                  const Icon(
+                                    Icons.error_outline,
+                                    color: Colors.red,
+                                    size: 24,
+                                  ),
+                                  const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
-                                      _credentialsError!,
+                                      _errorMessage!,
                                       style: const TextStyle(
                                         color: Colors.red,
                                         fontSize: 14,
-                                        fontWeight: FontWeight.w500,
+                                        fontWeight: FontWeight.w600,
                                       ),
                                     ),
                                   ),
@@ -226,8 +255,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               return null;
                             },
                             onChanged: (value) {
-                              if (_credentialsError != null) {
-                                setState(() => _credentialsError = null);
+                              if (_errorMessage != null) {
+                                setState(() => _errorMessage = null);
                               }
                             },
                           ),
@@ -262,8 +291,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               return null;
                             },
                             onChanged: (value) {
-                              if (_credentialsError != null) {
-                                setState(() => _credentialsError = null);
+                              if (_errorMessage != null) {
+                                setState(() => _errorMessage = null);
                               }
                             },
                           ),

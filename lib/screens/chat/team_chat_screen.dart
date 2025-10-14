@@ -104,26 +104,20 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
           ],
         ),
         actions: [
+          // View Members - Available for ALL members
+          IconButton(
+            icon: const Icon(Icons.people),
+            onPressed: () => _showViewMembersDialog(context),
+            tooltip: 'View Members',
+          ),
+
           // Add Members - Only for Team Leaders and Admins
-          if (canManageMembers)
+          if (canManageMembers) // ← This checks if user is team leader or admin
             IconButton(
-              icon: const Icon(Icons.person_add),
+              icon: const Icon(Icons.person_add), // ← ADD MEMBERS BUTTON
               onPressed: () => _showAddMembersDialog(context),
               tooltip: 'Add Members',
             ),
-          // Manage Members - Full control
-          if (canManageMembers)
-            IconButton(
-              icon: const Icon(Icons.group_add),
-              onPressed: () => _showManageMembersDialog(context),
-              tooltip: 'Manage Members',
-            ),
-          // Team Info
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: () => _showTeamInfo(context),
-            tooltip: 'Team Info',
-          ),
         ],
       ),
       body: Column(
@@ -282,6 +276,28 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
     }
   }
 
+  // View Members Dialog - Available for ALL members
+  void _showViewMembersDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.7,
+        minChildSize: 0.5,
+        maxChildSize: 0.9,
+        expand: false,
+        builder: (context, scrollController) => _ViewMembersSheet(
+          team: _currentTeam,
+          scrollController: scrollController,
+        ),
+      ),
+    );
+  }
+
+  // Add Members Dialog - Only for Team Leaders and Admins
   void _showAddMembersDialog(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -298,29 +314,6 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
           team: _currentTeam,
           scrollController: scrollController,
           onMembersAdded: () => setState(() {}),
-        ),
-      ),
-    );
-  }
-
-  void _showManageMembersDialog(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.5,
-        maxChildSize: 0.9,
-        expand: false,
-        builder: (context, scrollController) => _MemberManagementSheet(
-          team: _currentTeam,
-          scrollController: scrollController,
-          onTeamUpdated: (updatedTeam) {
-            setState(() => _currentTeam = updatedTeam);
-          },
         ),
       ),
     );
@@ -344,7 +337,247 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
   }
 }
 
-// Quick Add Members Sheet
+// NEW: View Members Sheet - For ALL team members
+class _ViewMembersSheet extends StatefulWidget {
+  final TeamModel team;
+  final ScrollController scrollController;
+
+  const _ViewMembersSheet({
+    required this.team,
+    required this.scrollController,
+  });
+
+  @override
+  State<_ViewMembersSheet> createState() => _ViewMembersSheetState();
+}
+
+class _ViewMembersSheetState extends State<_ViewMembersSheet> {
+  List<UserModel> _members = [];
+  UserModel? _leader;
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMembers();
+  }
+
+  Future<void> _loadMembers() async {
+    try {
+      // Load leader
+      final leaderDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(widget.team.leaderId)
+          .get();
+
+      if (leaderDoc.exists) {
+        _leader = UserModel.fromMap(leaderDoc.data()!, leaderDoc.id);
+      }
+
+      // Load members
+      final membersList = <UserModel>[];
+      for (String memberId in widget.team.memberIds) {
+        final memberDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(memberId)
+            .get();
+
+        if (memberDoc.exists) {
+          membersList.add(UserModel.fromMap(memberDoc.data()!, memberDoc.id));
+        }
+      }
+
+      setState(() {
+        _members = membersList;
+        _isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('Error loading members: $e');
+      setState(() => _isLoading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        children: [
+          Container(
+            width: 40,
+            height: 5,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2.5),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              const Icon(Icons.people, color: Color(0xFF1E293B)),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Team Members (${widget.team.memberIds.length + 1})',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Members List
+          Expanded(
+            child: _isLoading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView(
+                    controller: widget.scrollController,
+                    children: [
+                      // Team Leader
+                      if (_leader != null) ...[
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            'Team Leader',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                        _MemberCard(user: _leader!, isLeader: true),
+                        const SizedBox(height: 16),
+                      ],
+
+                      // Members
+                      if (_members.isNotEmpty) ...[
+                        const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 8),
+                          child: Text(
+                            'Members',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF64748B),
+                            ),
+                          ),
+                        ),
+                        ..._members.map((member) => _MemberCard(user: member)),
+                      ],
+
+                      if (_members.isEmpty && _leader != null)
+                        Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(32),
+                            child: Text(
+                              'No other members yet',
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MemberCard extends StatelessWidget {
+  final UserModel user;
+  final bool isLeader;
+
+  const _MemberCard({required this.user, this.isLeader = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: Stack(
+          children: [
+            CircleAvatar(
+              backgroundColor:
+                  isLeader ? Colors.amber : const Color(0xFF1E293B),
+              child: Text(
+                user.username[0].toUpperCase(),
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+            if (isLeader)
+              Positioned(
+                right: -2,
+                bottom: -2,
+                child: Container(
+                  padding: const EdgeInsets.all(2),
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.star,
+                    color: Colors.amber,
+                    size: 12,
+                  ),
+                ),
+              ),
+          ],
+        ),
+        title: Text(
+          user.displayName ?? user.username,
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('@${user.username}'),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: isLeader
+                        ? Colors.amber.withOpacity(0.2)
+                        : user.role == 'team_leader'
+                            ? Colors.blue.withOpacity(0.1)
+                            : Colors.grey.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Text(
+                    isLeader
+                        ? 'TEAM LEADER'
+                        : user.role.replaceAll('_', ' ').toUpperCase(),
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: isLeader
+                          ? Colors.amber[800]
+                          : user.role == 'team_leader'
+                              ? Colors.blue
+                              : Colors.grey[700],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// Quick Add Members Sheet - For Team Leaders
 class _AddMembersSheet extends StatefulWidget {
   final TeamModel team;
   final ScrollController scrollController;
@@ -581,281 +814,6 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
                                     ),
                                   ),
                                 ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  void dispose() {
-    _searchController.dispose();
-    super.dispose();
-  }
-}
-
-// Full Member Management Sheet
-class _MemberManagementSheet extends StatefulWidget {
-  final TeamModel team;
-  final ScrollController scrollController;
-  final Function(TeamModel) onTeamUpdated;
-
-  const _MemberManagementSheet({
-    required this.team,
-    required this.scrollController,
-    required this.onTeamUpdated,
-  });
-
-  @override
-  State<_MemberManagementSheet> createState() => _MemberManagementSheetState();
-}
-
-class _MemberManagementSheetState extends State<_MemberManagementSheet> {
-  final _searchController = TextEditingController();
-  List<UserModel> _allUsers = [];
-  List<UserModel> _filteredUsers = [];
-  bool _isLoading = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadUsers();
-  }
-
-  Future<void> _loadUsers() async {
-    try {
-      final snapshot =
-          await FirebaseFirestore.instance.collection('users').get();
-      final users = snapshot.docs
-          .map((doc) => UserModel.fromMap(doc.data(), doc.id))
-          .where((user) => user.uid != widget.team.leaderId)
-          .toList();
-
-      setState(() {
-        _allUsers = users;
-        _filteredUsers = users;
-        _isLoading = false;
-      });
-    } catch (e) {
-      debugPrint('Error loading users: $e');
-      setState(() => _isLoading = false);
-    }
-  }
-
-  void _filterUsers(String query) {
-    setState(() {
-      _filteredUsers = _allUsers.where((user) {
-        final username = user.username.toLowerCase();
-        final displayName = (user.displayName ?? '').toLowerCase();
-        final searchQuery = query.toLowerCase();
-        return username.contains(searchQuery) ||
-            displayName.contains(searchQuery);
-      }).toList();
-    });
-  }
-
-  Future<void> _toggleMembership(UserModel user) async {
-    try {
-      final isMember = widget.team.memberIds.contains(user.uid);
-      List<String> updatedMembers = List.from(widget.team.memberIds);
-
-      if (isMember) {
-        updatedMembers.remove(user.uid);
-      } else {
-        updatedMembers.add(user.uid);
-      }
-
-      await FirebaseFirestore.instance
-          .collection('teams')
-          .doc(widget.team.id)
-          .update({'memberIds': updatedMembers});
-
-      final updatedTeam = widget.team.copyWith(memberIds: updatedMembers);
-      widget.onTeamUpdated(updatedTeam);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              isMember
-                  ? '${user.username} removed from team'
-                  : '${user.username} added to team',
-            ),
-            backgroundColor: isMember ? Colors.orange : Colors.green,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        children: [
-          Container(
-            width: 40,
-            height: 5,
-            decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2.5),
-            ),
-          ),
-          const SizedBox(height: 20),
-          const Text(
-            'Manage Team Members',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _searchController,
-            onChanged: _filterUsers,
-            decoration: InputDecoration(
-              hintText: 'Search users...',
-              prefixIcon: const Icon(Icons.search),
-              suffixIcon: _searchController.text.isNotEmpty
-                  ? IconButton(
-                      icon: const Icon(Icons.clear),
-                      onPressed: () {
-                        _searchController.clear();
-                        _filterUsers('');
-                      },
-                    )
-                  : null,
-              filled: true,
-              fillColor: const Color(0xFFF1F5F9),
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E293B).withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.people,
-                  size: 18,
-                  color: Color(0xFF1E293B),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '${widget.team.memberIds.length + 1} team members',
-                  style: const TextStyle(
-                    color: Color(0xFF1E293B),
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredUsers.isEmpty
-                    ? Center(
-                        child: Text(
-                          _searchController.text.isNotEmpty
-                              ? 'No users found'
-                              : 'No users available',
-                          style: TextStyle(color: Colors.grey[600]),
-                        ),
-                      )
-                    : ListView.builder(
-                        controller: widget.scrollController,
-                        itemCount: _filteredUsers.length,
-                        itemBuilder: (context, index) {
-                          final user = _filteredUsers[index];
-                          final isMember =
-                              widget.team.memberIds.contains(user.uid);
-
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              leading: CircleAvatar(
-                                backgroundColor: const Color(0xFF1E293B),
-                                child: Text(
-                                  user.username[0].toUpperCase(),
-                                  style: const TextStyle(color: Colors.white),
-                                ),
-                              ),
-                              title: Text(
-                                user.displayName ?? user.username,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600),
-                              ),
-                              subtitle: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text('@${user.username}'),
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: user.role == 'team_leader'
-                                          ? Colors.blue.withOpacity(0.1)
-                                          : Colors.grey.withOpacity(0.1),
-                                      borderRadius: BorderRadius.circular(4),
-                                    ),
-                                    child: Text(
-                                      user.role
-                                          .replaceAll('_', ' ')
-                                          .toUpperCase(),
-                                      style: TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: user.role == 'team_leader'
-                                            ? Colors.blue
-                                            : Colors.grey[700],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              trailing: ElevatedButton.icon(
-                                onPressed: () => _toggleMembership(user),
-                                icon: Icon(
-                                  isMember ? Icons.remove : Icons.add,
-                                  size: 18,
-                                ),
-                                label: Text(isMember ? 'Remove' : 'Add'),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: isMember
-                                      ? Colors.red
-                                      : const Color(0xFF10B981),
-                                  foregroundColor: Colors.white,
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                    vertical: 8,
-                                  ),
-                                ),
                               ),
                             ),
                           );

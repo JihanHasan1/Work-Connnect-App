@@ -4,7 +4,10 @@ import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import '../../providers/auth_provider.dart';
 
 class DashboardScreen extends StatelessWidget {
-  const DashboardScreen({Key? key}) : super(key: key);
+  final Function(int) onNavigateToTab;
+
+  const DashboardScreen({Key? key, required this.onNavigateToTab})
+      : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -96,11 +99,9 @@ class DashboardScreen extends StatelessWidget {
                 subtitle: 'Communicate',
                 color: const Color(0xFF1E293B),
                 onTap: () {
-                  // Navigate to teams tab (index 1)
-                  final controller = DefaultTabController.of(context);
-                  if (controller != null) {
-                    controller.animateTo(1);
-                  }
+                  debugPrint(
+                      '🔄 Team Chat card tapped - navigating to index 1');
+                  onNavigateToTab(1); // Navigate to Teams tab
                 },
               ),
               _QuickActionCard(
@@ -109,11 +110,8 @@ class DashboardScreen extends StatelessWidget {
                 subtitle: 'Find Answers',
                 color: const Color(0xFF475569),
                 onTap: () {
-                  // Navigate to FAQ tab (index 2)
-                  final controller = DefaultTabController.of(context);
-                  if (controller != null) {
-                    controller.animateTo(2);
-                  }
+                  debugPrint('🔄 FAQs card tapped - navigating to index 2');
+                  onNavigateToTab(2); // Navigate to FAQ tab
                 },
               ),
               _QuickActionCard(
@@ -122,11 +120,8 @@ class DashboardScreen extends StatelessWidget {
                 subtitle: 'Get Help',
                 color: const Color(0xFF10B981),
                 onTap: () {
-                  // Navigate to chatbot tab (index 3)
-                  final controller = DefaultTabController.of(context);
-                  if (controller != null) {
-                    controller.animateTo(3);
-                  }
+                  debugPrint('🔄 ChatBot card tapped - navigating to index 3');
+                  onNavigateToTab(3); // Navigate to chatbot tab
                 },
               ),
               if (auth.isAdmin)
@@ -136,11 +131,8 @@ class DashboardScreen extends StatelessWidget {
                   subtitle: 'Manage',
                   color: const Color(0xFFEF4444),
                   onTap: () {
-                    // Navigate to admin tab (index 4)
-                    final controller = DefaultTabController.of(context);
-                    if (controller != null) {
-                      controller.animateTo(4);
-                    }
+                    debugPrint('🔄 Admin card tapped - navigating to index 4');
+                    onNavigateToTab(4); // Navigate to admin tab
                   },
                 ),
             ],
@@ -204,7 +196,10 @@ class _QuickActionCard extends StatelessWidget {
     return Card(
       elevation: 2,
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          debugPrint('🎯 Card tapped: $title');
+          onTap();
+        },
         borderRadius: BorderRadius.circular(16),
         child: Container(
           padding: const EdgeInsets.all(16),
