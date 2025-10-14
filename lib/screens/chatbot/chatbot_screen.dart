@@ -22,7 +22,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     super.initState();
     Future.microtask(() => context.read<ChatbotProvider>().loadBotKnowledge());
     _addMessage(
-      'Hello! I\'m here to help you. Ask me anything about workplace policies, procedures, or any other questions.',
+      'Hello! I\'m your ChatBot assistant. Ask me anything about workplace policies, procedures, or any other questions.',
       isBot: true,
     );
   }
@@ -68,7 +68,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        'AI Assistant',
+                        'ChatBot Assistant',
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -239,7 +239,7 @@ class _ChatBubble extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: message.isBot ? Colors.white : const Color(0xFF6366F1),
+                color: message.isBot ? Colors.white : const Color(0xFF1E293B),
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(16),
                   topRight: const Radius.circular(16),

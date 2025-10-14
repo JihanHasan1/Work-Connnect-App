@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/team_model.dart';
 import '../models/message_model.dart';
 import '../models/user_model.dart';
+import '../services/notification_service.dart';
 
 class ChatProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -23,7 +24,7 @@ class ChatProvider extends ChangeNotifier {
   // Get teams for a specific user
   Stream<List<TeamModel>> getUserTeams(String userId, bool isAdmin) {
     if (isAdmin) {
-      return getTeams(); // Admin sees all teams
+      return getTeams();
     }
 
     return _firestore.collection('teams').snapshots().map((snapshot) {
@@ -45,7 +46,7 @@ class ChatProvider extends ChangeNotifier {
     });
   }
 
-  // Get team messages with pagination support
+  // Get team messages
   Stream<List<MessageModel>> getTeamMessages(String teamId, {int limit = 100}) {
     return _firestore
         .collection('teams')
@@ -61,31 +62,53 @@ class ChatProvider extends ChangeNotifier {
     });
   }
 
-  // Send a message to a team
+  // Send a message with notification
   Future<void> sendMessage(String teamId, MessageModel message) async {
     try {
+      // Add message to Firestore
       await _firestore
           .collection('teams')
           .doc(teamId)
           .collection('messages')
           .add(message.toMap());
 
-      // Update team's last message timestamp
+      // Update team's last message
       await _firestore.collection('teams').doc(teamId).update({
         'lastMessageAt': message.timestamp.toIso8601String(),
         'lastMessage': message.content,
         'lastMessageBy': message.senderName,
       });
 
-      // Send notification to team members (placeholder for future implementation)
-      await _sendNotificationToTeamMembers(teamId, message);
+      // Get team details for notification
+      final teamDoc = await _firestore.collection('teams').doc(teamId).get();
+      if (teamDoc.exists) {
+        final teamData = teamDoc.data()!;
+        final memberIds = List<String>.from(teamData['memberIds'] ?? []);
+        memberIds.add(teamData['leaderId']); // Add leader
+
+        // Remove sender from notification recipients
+        memberIds.remove(message.senderId);
+
+        // Send push notification to team members
+        if (memberIds.isNotEmpty) {
+          await FCMNotificationService.sendTeamMessageNotification(
+            teamId: teamId,
+            teamName: teamData['name'] ?? 'Team',
+            senderName: message.senderName,
+            messageContent: message.content.length > 50
+                ? '${message.content.substring(0, 50)}...'
+                : message.content,
+            memberIds: memberIds,
+          );
+        }
+      }
     } catch (e) {
       debugPrint('Error sending message: $e');
       rethrow;
     }
   }
 
-  // Create a new team
+  // Create a team
   Future<void> createTeam(TeamModel team) async {
     try {
       await _firestore.collection('teams').doc(team.id).set(team.toMap());
@@ -108,7 +131,7 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  // Update team details
+  // Update team
   Future<void> updateTeam(TeamModel team) async {
     try {
       await _firestore.collection('teams').doc(team.id).update(team.toMap());
@@ -119,10 +142,9 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  // Delete a team
+  // Delete team
   Future<void> deleteTeam(String teamId) async {
     try {
-      // Delete all messages first
       final messages = await _firestore
           .collection('teams')
           .doc(teamId)
@@ -133,7 +155,6 @@ class ChatProvider extends ChangeNotifier {
         await doc.reference.delete();
       }
 
-      // Delete the team
       await _firestore.collection('teams').doc(teamId).delete();
       notifyListeners();
     } catch (e) {
@@ -201,7 +222,6 @@ class ChatProvider extends ChangeNotifier {
         'updatedAt': DateTime.now().toIso8601String(),
       });
 
-      // Send notification about member removal
       final userDoc = await _firestore.collection('users').doc(userId).get();
       if (userDoc.exists) {
         final userData = userDoc.data()!;
@@ -232,7 +252,6 @@ class ChatProvider extends ChangeNotifier {
         'updatedAt': DateTime.now().toIso8601String(),
       });
 
-      // Send notification about leadership change
       final userDoc =
           await _firestore.collection('users').doc(newLeaderId).get();
       if (userDoc.exists) {
@@ -288,7 +307,7 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  // Get unread message count for a team
+  // Get unread message count
   Stream<int> getUnreadMessageCount(String teamId, String userId) {
     return _firestore
         .collection('teams')
@@ -300,7 +319,7 @@ class ChatProvider extends ChangeNotifier {
         .map((snapshot) => snapshot.docs.length);
   }
 
-  // Search messages in a team
+  // Search messages
   Future<List<MessageModel>> searchMessages(String teamId, String query) async {
     try {
       final snapshot = await _firestore
@@ -340,15 +359,7 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  // Send notification to team members (placeholder)
-  Future<void> _sendNotificationToTeamMembers(
-      String teamId, MessageModel message) async {
-    // This is a placeholder for push notification implementation
-    // You would integrate with Firebase Cloud Messaging here
-    debugPrint('Notification would be sent to team members');
-  }
-
-  // Get teams with unread messages for a user
+  // Get teams with unread counts
   Stream<Map<String, int>> getTeamsWithUnreadCounts(String userId) {
     return _firestore
         .collection('teams')
@@ -359,7 +370,6 @@ class ChatProvider extends ChangeNotifier {
       for (var teamDoc in teamsSnapshot.docs) {
         final team = TeamModel.fromMap(teamDoc.data(), teamDoc.id);
 
-        // Check if user is a member
         if (team.leaderId == userId || team.memberIds.contains(userId)) {
           final unreadSnapshot = await _firestore
               .collection('teams')
@@ -379,7 +389,7 @@ class ChatProvider extends ChangeNotifier {
     });
   }
 
-  // Delete a message
+  // Delete message
   Future<void> deleteMessage(String teamId, String messageId) async {
     try {
       await _firestore
@@ -394,7 +404,7 @@ class ChatProvider extends ChangeNotifier {
     }
   }
 
-  // Edit a message
+  // Edit message
   Future<void> editMessage(
       String teamId, String messageId, String newContent) async {
     try {

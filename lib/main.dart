@@ -6,6 +6,7 @@ import 'providers/auth_provider.dart';
 import 'providers/chat_provider.dart';
 import 'providers/faq_provider.dart';
 import 'providers/chatbot_provider.dart';
+import 'services/notification_service.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/home/home_screen.dart';
 
@@ -17,6 +18,10 @@ void main() async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     debugPrint('✅ Firebase initialized successfully');
+
+    // Initialize Firebase Cloud Messaging
+    await FCMNotificationService.initialize();
+    debugPrint('✅ FCM initialized successfully');
   } catch (e) {
     debugPrint('❌ Firebase initialization error: $e');
   }
@@ -42,13 +47,18 @@ class WorkConnectApp extends StatelessWidget {
         theme: ThemeData(
           useMaterial3: true,
           colorScheme: ColorScheme.fromSeed(
-            seedColor: const Color(0xFF6366F1),
+            seedColor: const Color(0xFF1E293B),
             brightness: Brightness.light,
+            primary: const Color(0xFF1E293B),
+            onPrimary: Colors.white,
+            secondary: const Color(0xFF334155),
+            onSecondary: Colors.white,
+            surface: Colors.white,
+            onSurface: const Color(0xFF1E293B),
+            error: const Color(0xFFEF4444),
           ),
           fontFamily: 'Inter',
           scaffoldBackgroundColor: const Color(0xFFF8FAFC),
-
-          // AppBar Theme
           appBarTheme: const AppBarTheme(
             centerTitle: true,
             elevation: 0,
@@ -56,8 +66,6 @@ class WorkConnectApp extends StatelessWidget {
             foregroundColor: Color(0xFF1E293B),
             iconTheme: IconThemeData(color: Color(0xFF1E293B)),
           ),
-
-          // Card Theme - FIXED
           cardTheme: const CardThemeData(
             elevation: 0,
             shape: RoundedRectangleBorder(
@@ -66,8 +74,6 @@ class WorkConnectApp extends StatelessWidget {
             color: Colors.white,
             margin: EdgeInsets.zero,
           ),
-
-          // Input Decoration Theme
           inputDecorationTheme: InputDecorationTheme(
             filled: true,
             fillColor: Colors.white,
@@ -81,23 +87,21 @@ class WorkConnectApp extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Color(0xFF6366F1), width: 2),
+              borderSide: const BorderSide(color: Color(0xFF1E293B), width: 2),
             ),
             errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.red),
+              borderSide: const BorderSide(color: Color(0xFFEF4444)),
             ),
             focusedErrorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: Colors.red, width: 2),
+              borderSide: const BorderSide(color: Color(0xFFEF4444), width: 2),
             ),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             prefixIconColor: Color(0xFF64748B),
             suffixIconColor: Color(0xFF64748B),
           ),
-
-          // Button Themes
           elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(
               elevation: 0,
@@ -105,29 +109,24 @@ class WorkConnectApp extends StatelessWidget {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
-              backgroundColor: const Color(0xFF6366F1),
+              backgroundColor: const Color(0xFF1E293B),
               foregroundColor: Colors.white,
             ),
           ),
-
           textButtonTheme: TextButtonThemeData(
             style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF6366F1),
+              foregroundColor: const Color(0xFF1E293B),
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
             ),
           ),
-
-          // FAB Theme
           floatingActionButtonTheme: const FloatingActionButtonThemeData(
-            backgroundColor: Color(0xFF6366F1),
+            backgroundColor: Color(0xFF1E293B),
             foregroundColor: Colors.white,
             elevation: 2,
           ),
-
-          // Chip Theme
           chipTheme: ChipThemeData(
             backgroundColor: const Color(0xFFF1F5F9),
-            selectedColor: const Color(0xFF6366F1),
+            selectedColor: const Color(0xFF1E293B),
             labelStyle: const TextStyle(
               color: Color(0xFF1E293B),
               fontSize: 12,
@@ -137,16 +136,12 @@ class WorkConnectApp extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
           ),
-
-          // Divider Theme
           dividerTheme: const DividerThemeData(
             color: Color(0xFFE2E8F0),
             thickness: 1,
           ),
-
-          // Progress Indicator Theme
           progressIndicatorTheme: const ProgressIndicatorThemeData(
-            color: Color(0xFF6366F1),
+            color: Color(0xFF1E293B),
           ),
         ),
         home: const AuthWrapper(),
@@ -155,8 +150,36 @@ class WorkConnectApp extends StatelessWidget {
   }
 }
 
-class AuthWrapper extends StatelessWidget {
+class AuthWrapper extends StatefulWidget {
   const AuthWrapper({Key? key}) : super(key: key);
+
+  @override
+  State<AuthWrapper> createState() => _AuthWrapperState();
+}
+
+class _AuthWrapperState extends State<AuthWrapper> {
+  @override
+  void initState() {
+    super.initState();
+    _setupNotifications();
+  }
+
+  Future<void> _setupNotifications() async {
+    // Wait for auth to initialize
+    await Future.delayed(const Duration(seconds: 1));
+
+    final auth = context.read<AuthProvider>();
+    if (auth.currentUser != null) {
+      // Save FCM token
+      final token = await FirebaseMessaging.instance.getToken();
+      if (token != null) {
+        await FCMNotificationService.saveTokenToDatabase(
+          token,
+          auth.currentUser!.uid,
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -170,9 +193,9 @@ class AuthWrapper extends StatelessWidget {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Color(0xFF6366F1),
-                    Color(0xFF8B5CF6),
-                    Color(0xFFA855F7),
+                    Color(0xFF1E293B),
+                    Color(0xFF334155),
+                    Color(0xFF475569),
                   ],
                 ),
               ),
@@ -190,7 +213,7 @@ class AuthWrapper extends StatelessWidget {
                       child: const Icon(
                         Icons.work_outline,
                         size: 50,
-                        color: Color(0xFF6366F1),
+                        color: Color(0xFF1E293B),
                       ),
                     ),
                     const SizedBox(height: 24),

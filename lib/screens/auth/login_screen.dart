@@ -17,6 +17,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
+  String? _credentialsError;
+
   @override
   void dispose() {
     _usernameController.dispose();
@@ -25,25 +27,47 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleLogin() async {
+    // Clear previous errors
+    setState(() {
+      _credentialsError = null;
+    });
+
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
       final auth = context.read<AuthProvider>();
-      final success = await auth.signIn(
-        _usernameController.text.trim(),
+      final result = await auth.signIn(
+        _usernameController.text,
         _passwordController.text,
       );
 
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Login successful!'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
+      if (mounted) {
+        if (result['success']) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Login successful!'),
+              backgroundColor: Colors.green,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        } else {
+          // Display generic error message
+          if (result['field'] == 'credentials') {
+            setState(() {
+              _credentialsError = result['message'];
+            });
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(result['message']),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 3),
+              ),
+            );
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -71,9 +95,9 @@ class _LoginScreenState extends State<LoginScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Color(0xFF6366F1),
-              Color(0xFF8B5CF6),
-              Color(0xFFA855F7),
+              Color(0xFF1E293B),
+              Color(0xFF334155),
+              Color(0xFF475569),
             ],
           ),
         ),
@@ -95,7 +119,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.1),
+                            color: Colors.black.withOpacity(0.2),
                             blurRadius: 20,
                             offset: const Offset(0, 10),
                           ),
@@ -104,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: const Icon(
                         FontAwesomeIcons.briefcase,
                         size: 50,
-                        color: Color(0xFF6366F1),
+                        color: Color(0xFF1E293B),
                       ),
                     ),
                     const SizedBox(height: 32),
@@ -156,6 +180,36 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 24),
 
+                          // Error Message (if any)
+                          if (_credentialsError != null)
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              margin: const EdgeInsets.only(bottom: 16),
+                              decoration: BoxDecoration(
+                                color: Colors.red.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                    color: Colors.red.withOpacity(0.3)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.error_outline,
+                                      color: Colors.red, size: 20),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      _credentialsError!,
+                                      style: const TextStyle(
+                                        color: Colors.red,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+
                           // Username Field
                           TextFormField(
                             controller: _usernameController,
@@ -170,6 +224,11 @@ class _LoginScreenState extends State<LoginScreen> {
                                 return 'Please enter username';
                               }
                               return null;
+                            },
+                            onChanged: (value) {
+                              if (_credentialsError != null) {
+                                setState(() => _credentialsError = null);
+                              }
                             },
                           ),
                           const SizedBox(height: 16),
@@ -202,6 +261,29 @@ class _LoginScreenState extends State<LoginScreen> {
                               }
                               return null;
                             },
+                            onChanged: (value) {
+                              if (_credentialsError != null) {
+                                setState(() => _credentialsError = null);
+                              }
+                            },
+                          ),
+                          const SizedBox(height: 8),
+
+                          // Case Sensitive Notice
+                          Row(
+                            children: [
+                              Icon(Icons.info_outline,
+                                  size: 16, color: Colors.grey[600]),
+                              const SizedBox(width: 4),
+                              Text(
+                                'Login is case-sensitive',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
                           ),
                           const SizedBox(height: 24),
 
@@ -209,7 +291,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ElevatedButton(
                             onPressed: _isLoading ? null : _handleLogin,
                             style: ElevatedButton.styleFrom(
-                              backgroundColor: const Color(0xFF6366F1),
+                              backgroundColor: const Color(0xFF1E293B),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(vertical: 16),
                               disabledBackgroundColor: Colors.grey,
@@ -231,37 +313,6 @@ class _LoginScreenState extends State<LoginScreen> {
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                          ),
-                          const SizedBox(height: 16),
-
-                          // Demo Credentials
-                          Container(
-                            padding: const EdgeInsets.all(12),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFF1F5F9),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                const Text(
-                                  'Demo Credentials:',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                    color: Color(0xFF64748B),
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Admin: admin / admin',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[700],
-                                  ),
-                                ),
-                              ],
-                            ),
                           ),
                         ],
                       ),

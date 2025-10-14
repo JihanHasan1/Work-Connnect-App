@@ -21,7 +21,7 @@ class DashboardScreen extends StatelessWidget {
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               gradient: const LinearGradient(
-                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                colors: [Color(0xFF1E293B), Color(0xFF334155)],
               ),
               borderRadius: BorderRadius.circular(16),
             ),
@@ -94,30 +94,39 @@ class DashboardScreen extends StatelessWidget {
                 icon: FontAwesomeIcons.users,
                 title: 'Team Chat',
                 subtitle: 'Communicate',
-                color: const Color(0xFF3B82F6),
+                color: const Color(0xFF1E293B),
                 onTap: () {
                   // Navigate to teams tab (index 1)
-                  DefaultTabController.of(context).animateTo(1);
+                  final controller = DefaultTabController.of(context);
+                  if (controller != null) {
+                    controller.animateTo(1);
+                  }
                 },
               ),
               _QuickActionCard(
                 icon: FontAwesomeIcons.circleQuestion,
                 title: 'FAQs',
                 subtitle: 'Find Answers',
-                color: const Color(0xFF8B5CF6),
+                color: const Color(0xFF475569),
                 onTap: () {
                   // Navigate to FAQ tab (index 2)
-                  DefaultTabController.of(context).animateTo(2);
+                  final controller = DefaultTabController.of(context);
+                  if (controller != null) {
+                    controller.animateTo(2);
+                  }
                 },
               ),
               _QuickActionCard(
                 icon: FontAwesomeIcons.robot,
-                title: 'AI Assistant',
+                title: 'ChatBot',
                 subtitle: 'Get Help',
                 color: const Color(0xFF10B981),
                 onTap: () {
                   // Navigate to chatbot tab (index 3)
-                  DefaultTabController.of(context).animateTo(3);
+                  final controller = DefaultTabController.of(context);
+                  if (controller != null) {
+                    controller.animateTo(3);
+                  }
                 },
               ),
               if (auth.isAdmin)
@@ -128,7 +137,10 @@ class DashboardScreen extends StatelessWidget {
                   color: const Color(0xFFEF4444),
                   onTap: () {
                     // Navigate to admin tab (index 4)
-                    DefaultTabController.of(context).animateTo(4);
+                    final controller = DefaultTabController.of(context);
+                    if (controller != null) {
+                      controller.animateTo(4);
+                    }
                   },
                 ),
             ],
@@ -150,14 +162,14 @@ class DashboardScreen extends StatelessWidget {
             icon: Icons.chat_bubble_outline,
             title: 'New message in Team Chat',
             time: '5 minutes ago',
-            color: Colors.blue,
+            color: Color(0xFF1E293B),
           ),
           const SizedBox(height: 12),
           _ActivityCard(
             icon: Icons.help_outline,
             title: 'FAQ updated: Company Policies',
             time: '1 hour ago',
-            color: Colors.purple,
+            color: Color(0xFF475569),
           ),
           const SizedBox(height: 12),
           _ActivityCard(
@@ -190,6 +202,7 @@ class _QuickActionCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
+      elevation: 2,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(16),

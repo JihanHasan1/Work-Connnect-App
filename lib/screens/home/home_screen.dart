@@ -119,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen>
                   value: 'profile_header',
                   child: ListTile(
                     leading: CircleAvatar(
-                      backgroundColor: const Color(0xFF6366F1),
+                      backgroundColor: const Color(0xFF1E293B),
                       child: Text(
                         (auth.currentUser?.username ?? 'U')[0].toUpperCase(),
                         style: const TextStyle(
@@ -148,7 +148,7 @@ class _HomeScreenState extends State<HomeScreen>
                 const PopupMenuItem<String>(
                   value: 'profile',
                   child: ListTile(
-                    leading: Icon(Icons.person, color: Color(0xFF6366F1)),
+                    leading: Icon(Icons.person, color: Color(0xFF1E293B)),
                     title: Text('Profile'),
                     contentPadding: EdgeInsets.zero,
                   ),
@@ -206,7 +206,7 @@ class _HomeScreenState extends State<HomeScreen>
             const NavigationDestination(
               icon: Icon(Icons.smart_toy_outlined),
               selectedIcon: Icon(Icons.smart_toy),
-              label: 'Assistant',
+              label: 'ChatBot', // Changed from 'Assistant'
             ),
             if (auth.isAdmin)
               const NavigationDestination(

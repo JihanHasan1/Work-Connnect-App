@@ -57,7 +57,7 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> signIn(String username, String password) async {
+  Future<Map<String, dynamic>> signIn(String username, String password) async {
     try {
       _isLoading = true;
       notifyListeners();
@@ -65,8 +65,8 @@ class AuthProvider extends ChangeNotifier {
       debugPrint('🔐 Attempting login...');
       debugPrint('Username: $username');
 
-      // Admin login - HARDCODED
-      if (username.toLowerCase() == 'admin' && password == 'admin') {
+      // CASE SENSITIVE ADMIN LOGIN
+      if (username == 'admin' && password == 'admin') {
         debugPrint('✅ Admin credentials matched');
 
         // Sign in anonymously for Firebase
@@ -90,11 +90,13 @@ class AuthProvider extends ChangeNotifier {
 
         _isLoading = false;
         notifyListeners();
-        return true;
+        return {'success': true};
       }
 
-      // Regular user login from Firestore
+      // CASE SENSITIVE USER LOGIN from Firestore
       debugPrint('🔍 Checking Firestore for user...');
+
+      // Query with EXACT case-sensitive username match
       final userQuery = await _firestore
           .collection('users')
           .where('username', isEqualTo: username)
@@ -103,46 +105,64 @@ class AuthProvider extends ChangeNotifier {
 
       if (userQuery.docs.isEmpty) {
         debugPrint('❌ Username not found in Firestore');
-        throw 'Username not found';
+        _isLoading = false;
+        notifyListeners();
+        return {
+          'success': false,
+          'field': 'credentials',
+          'message': 'Invalid username or password'
+        };
       }
 
       final userData = userQuery.docs.first;
       final storedPassword = userData.data()['password'];
+      final userId = userData.id;
 
-      debugPrint('✅ User found in Firestore');
+      debugPrint('✅ User found in Firestore with ID: $userId');
 
+      // CASE SENSITIVE PASSWORD CHECK
       if (storedPassword != password) {
         debugPrint('❌ Password incorrect');
-        throw 'Invalid password';
+        _isLoading = false;
+        notifyListeners();
+        return {
+          'success': false,
+          'field': 'credentials',
+          'message': 'Invalid username or password'
+        };
       }
 
       debugPrint('✅ Password matched');
 
-      // Sign in anonymously
+      // Sign in anonymously for Firebase Auth
       final userCred = await _auth.signInAnonymously();
 
-      // Update user document with last login
-      await _firestore.collection('users').doc(userCred.user!.uid).set({
-        ...userData.data(),
+      // Only UPDATE existing document, don't create new one
+      await _firestore.collection('users').doc(userId).update({
         'lastLogin': DateTime.now().toIso8601String(),
       });
 
-      _currentUser = UserModel.fromMap(userData.data(), userCred.user!.uid);
+      _currentUser = UserModel.fromMap(userData.data(), userId);
 
       // Save to SharedPreferences
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('username', username);
       await prefs.setString('role', _currentUser!.role);
+      await prefs.setString('userId', userId);
       debugPrint('✅ User session saved');
 
       _isLoading = false;
       notifyListeners();
-      return true;
+      return {'success': true};
     } catch (e) {
       debugPrint('❌ Sign in error: $e');
       _isLoading = false;
       notifyListeners();
-      rethrow;
+      return {
+        'success': false,
+        'field': 'general',
+        'message': 'An error occurred: ${e.toString()}'
+      };
     }
   }
 
