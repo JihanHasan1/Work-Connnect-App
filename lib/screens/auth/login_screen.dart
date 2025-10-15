@@ -17,7 +17,8 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _isLoading = false;
   bool _obscurePassword = true;
 
-  String? _errorMessage;
+  String? _usernameError;
+  String? _passwordError;
 
   @override
   void dispose() {
@@ -31,7 +32,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
     // Clear previous errors
     setState(() {
-      _errorMessage = null;
+      _usernameError = null;
+      _passwordError = null;
     });
 
     if (!_formKey.currentState!.validate()) {
@@ -61,32 +63,69 @@ class _LoginScreenState extends State<LoginScreen> {
           debugPrint('✅ Login successful');
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Login successful!'),
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white),
+                  SizedBox(width: 12),
+                  Text('Login successful!'),
+                ],
+              ),
               backgroundColor: Colors.green,
               duration: Duration(seconds: 2),
+              behavior: SnackBarBehavior.floating,
             ),
           );
         } else {
-          // Display error message
-          final errorMsg = result['message'] ?? 'Invalid username or password';
-          debugPrint('❌ Login failed: $errorMsg');
+          // Get error details
+          final errorField = result['field'];
+          final errorMessage = result['message'] ?? 'Login failed';
 
+          debugPrint('❌ Login failed: $errorMessage (field: $errorField)');
+
+          // Set field-specific error
           setState(() {
-            _errorMessage = errorMsg;
+            if (errorField == 'username') {
+              _usernameError = errorMessage;
+            } else if (errorField == 'password') {
+              _passwordError = errorMessage;
+            }
           });
 
-          // Also show SnackBar for immediate feedback
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Row(
+          // Show error dialog
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: Row(
                 children: [
-                  const Icon(Icons.error_outline, color: Colors.white),
-                  const SizedBox(width: 8),
-                  Expanded(child: Text(errorMsg)),
+                  Icon(Icons.error_outline, color: Colors.red, size: 28),
+                  SizedBox(width: 12),
+                  Text('Login Failed'),
                 ],
               ),
-              backgroundColor: Colors.red,
-              duration: const Duration(seconds: 3),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(errorMessage, style: TextStyle(fontSize: 16)),
+                  SizedBox(height: 16),
+                  if (errorField == 'username')
+                    Text(
+                      '• Check if your username is correct\n• Username is case-sensitive',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    ),
+                  if (errorField == 'password')
+                    Text(
+                      '• Check if your password is correct\n• Password is case-sensitive',
+                      style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+                    ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: Text('OK'),
+                ),
+              ],
             ),
           );
         }
@@ -94,16 +133,25 @@ class _LoginScreenState extends State<LoginScreen> {
     } catch (e) {
       debugPrint('💥 Exception during login: $e');
       if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = 'An error occurred. Please try again.';
-        });
+        setState(() => _isLoading = false);
 
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.error_outline, color: Colors.red),
+                SizedBox(width: 12),
+                Text('Error'),
+              ],
+            ),
+            content: Text('An error occurred. Please try again.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('OK'),
+              ),
+            ],
           ),
         );
       }
@@ -204,47 +252,14 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                           const SizedBox(height: 24),
 
-                          // Error Message Banner (if any)
-                          if (_errorMessage != null)
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              margin: const EdgeInsets.only(bottom: 16),
-                              decoration: BoxDecoration(
-                                color: Colors.red.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(
-                                  color: Colors.red.withOpacity(0.5),
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(
-                                    Icons.error_outline,
-                                    color: Colors.red,
-                                    size: 24,
-                                  ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Text(
-                                      _errorMessage!,
-                                      style: const TextStyle(
-                                        color: Colors.red,
-                                        fontSize: 14,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
                           // Username Field
                           TextFormField(
                             controller: _usernameController,
-                            decoration: const InputDecoration(
+                            decoration: InputDecoration(
                               labelText: 'Username',
-                              prefixIcon: Icon(Icons.person_outline),
+                              prefixIcon: const Icon(Icons.person_outline),
+                              errorText: _usernameError,
+                              errorMaxLines: 2,
                             ),
                             textInputAction: TextInputAction.next,
                             enabled: !_isLoading,
@@ -255,8 +270,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               return null;
                             },
                             onChanged: (value) {
-                              if (_errorMessage != null) {
-                                setState(() => _errorMessage = null);
+                              if (_usernameError != null) {
+                                setState(() => _usernameError = null);
                               }
                             },
                           ),
@@ -269,6 +284,8 @@ class _LoginScreenState extends State<LoginScreen> {
                             decoration: InputDecoration(
                               labelText: 'Password',
                               prefixIcon: const Icon(Icons.lock_outline),
+                              errorText: _passwordError,
+                              errorMaxLines: 2,
                               suffixIcon: IconButton(
                                 icon: Icon(
                                   _obscurePassword
@@ -291,8 +308,8 @@ class _LoginScreenState extends State<LoginScreen> {
                               return null;
                             },
                             onChanged: (value) {
-                              if (_errorMessage != null) {
-                                setState(() => _errorMessage = null);
+                              if (_passwordError != null) {
+                                setState(() => _passwordError = null);
                               }
                             },
                           ),

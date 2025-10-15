@@ -48,14 +48,17 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
     final auth = context.watch<AuthProvider>();
     final chatProvider = context.watch<ChatProvider>();
 
-    // Check if user is a member
     final isMember = auth.isAdmin ||
         _currentTeam.leaderId == auth.currentUser?.uid ||
         _currentTeam.memberIds.contains(auth.currentUser?.uid);
 
-    // Check if user can manage members (admin or team leader)
     final canManageMembers =
         auth.isAdmin || _currentTeam.leaderId == auth.currentUser?.uid;
+
+    debugPrint('🔍 Current User ID: ${auth.currentUser?.uid}');
+    debugPrint('🔍 Team Leader ID: ${_currentTeam.leaderId}');
+    debugPrint('🔍 Is Admin: ${auth.isAdmin}');
+    debugPrint('🔍 Can Manage Members: $canManageMembers');
 
     if (!isMember) {
       return Scaffold(
@@ -66,19 +69,14 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
             children: [
               Icon(Icons.lock_outline, size: 80, color: Colors.grey[400]),
               const SizedBox(height: 16),
-              Text(
-                'Access Restricted',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.grey[700],
-                ),
-              ),
+              Text('Access Restricted',
+                  style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[700])),
               const SizedBox(height: 8),
-              Text(
-                'You are not a member of this team',
-                style: TextStyle(fontSize: 16, color: Colors.grey[600]),
-              ),
+              Text('You are not a member of this team',
+                  style: TextStyle(fontSize: 16, color: Colors.grey[600])),
               const SizedBox(height: 24),
               ElevatedButton.icon(
                 onPressed: () => Navigator.pop(context),
@@ -97,32 +95,29 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(_currentTeam.name),
-            Text(
-              '${_currentTeam.memberIds.length + 1} members',
-              style: const TextStyle(fontSize: 12),
-            ),
+            Text('${_currentTeam.memberIds.length + 1} members',
+                style: const TextStyle(fontSize: 12)),
           ],
         ),
         actions: [
-          // View Members - Available for ALL members
           IconButton(
             icon: const Icon(Icons.people),
             onPressed: () => _showViewMembersDialog(context),
             tooltip: 'View Members',
           ),
-
-          // Add Members - Only for Team Leaders and Admins
-          if (canManageMembers) // ← This checks if user is team leader or admin
+          if (canManageMembers)
             IconButton(
-              icon: const Icon(Icons.person_add), // ← ADD MEMBERS BUTTON
-              onPressed: () => _showAddMembersDialog(context),
+              icon: const Icon(Icons.person_add),
+              onPressed: () {
+                debugPrint('➕ Add Members button tapped');
+                _showAddMembersDialog(context);
+              },
               tooltip: 'Add Members',
             ),
         ],
       ),
       body: Column(
         children: [
-          // Team Description Banner
           if (_currentTeam.description.isNotEmpty)
             Container(
               width: double.infinity,
@@ -131,32 +126,21 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFF1E293B).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(
-                  color: const Color(0xFF1E293B).withOpacity(0.3),
-                ),
+                border:
+                    Border.all(color: const Color(0xFF1E293B).withOpacity(0.3)),
               ),
               child: Row(
                 children: [
-                  const Icon(
-                    Icons.campaign,
-                    color: Color(0xFF1E293B),
-                    size: 20,
-                  ),
+                  const Icon(Icons.campaign,
+                      color: Color(0xFF1E293B), size: 20),
                   const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      _currentTeam.description,
-                      style: const TextStyle(
-                        fontSize: 13,
-                        color: Color(0xFF1E293B),
-                      ),
-                    ),
-                  ),
+                      child: Text(_currentTeam.description,
+                          style: const TextStyle(
+                              fontSize: 13, color: Color(0xFF1E293B)))),
                 ],
               ),
             ),
-
-          // Messages List
           Expanded(
             child: StreamBuilder<List<MessageModel>>(
               stream: chatProvider.getTeamMessages(_currentTeam.id),
@@ -164,40 +148,26 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
-
                 if (!snapshot.hasData || snapshot.data!.isEmpty) {
                   return Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Icon(
-                          Icons.chat_bubble_outline,
-                          size: 80,
-                          color: Colors.grey[400],
-                        ),
+                        Icon(Icons.chat_bubble_outline,
+                            size: 80, color: Colors.grey[400]),
                         const SizedBox(height: 16),
-                        Text(
-                          'No messages yet',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
-                          ),
-                        ),
+                        Text('No messages yet',
+                            style: TextStyle(
+                                fontSize: 18, color: Colors.grey[600])),
                         const SizedBox(height: 8),
-                        Text(
-                          'Start the conversation!',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[500],
-                          ),
-                        ),
+                        Text('Start the conversation!',
+                            style: TextStyle(
+                                fontSize: 14, color: Colors.grey[500])),
                       ],
                     ),
                   );
                 }
-
                 final messages = snapshot.data!;
-
                 return ListView.builder(
                   controller: _scrollController,
                   padding: const EdgeInsets.all(16),
@@ -206,34 +176,24 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
                   itemBuilder: (context, index) {
                     final message = messages[index];
                     final isMe = message.senderId == auth.currentUser?.uid;
-
-                    // Show date separator
                     bool showDateSeparator = false;
                     if (index == messages.length - 1) {
                       showDateSeparator = true;
                     } else {
-                      final currentDate = DateTime(
-                        message.timestamp.year,
-                        message.timestamp.month,
-                        message.timestamp.day,
-                      );
+                      final currentDate = DateTime(message.timestamp.year,
+                          message.timestamp.month, message.timestamp.day);
                       final nextDate = DateTime(
-                        messages[index + 1].timestamp.year,
-                        messages[index + 1].timestamp.month,
-                        messages[index + 1].timestamp.day,
-                      );
+                          messages[index + 1].timestamp.year,
+                          messages[index + 1].timestamp.month,
+                          messages[index + 1].timestamp.day);
                       showDateSeparator = currentDate != nextDate;
                     }
-
                     return Column(
                       children: [
                         if (showDateSeparator)
                           _DateSeparator(date: message.timestamp),
                         _MessageBubble(
-                          message: message,
-                          isMe: isMe,
-                          showSender: !isMe,
-                        ),
+                            message: message, isMe: isMe, showSender: !isMe),
                       ],
                     );
                   },
@@ -241,12 +201,9 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
               },
             ),
           ),
-
-          // Message Input
           _MessageInput(
-            controller: _messageController,
-            onSend: () => _sendMessage(auth, chatProvider),
-          ),
+              controller: _messageController,
+              onSend: () => _sendMessage(auth, chatProvider)),
         ],
       ),
     );
@@ -255,7 +212,6 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
   Future<void> _sendMessage(
       AuthProvider auth, ChatProvider chatProvider) async {
     if (_messageController.text.trim().isEmpty) return;
-
     final message = MessageModel(
       id: DateTime.now().millisecondsSinceEpoch.toString(),
       senderId: auth.currentUser!.uid,
@@ -263,48 +219,38 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
       content: _messageController.text.trim(),
       timestamp: DateTime.now(),
     );
-
     await chatProvider.sendMessage(_currentTeam.id, message);
     _messageController.clear();
-
     if (_scrollController.hasClients) {
-      _scrollController.animateTo(
-        0,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.easeOut,
-      );
+      _scrollController.animateTo(0,
+          duration: const Duration(milliseconds: 300), curve: Curves.easeOut);
     }
   }
 
-  // View Members Dialog - Available for ALL members
   void _showViewMembersDialog(BuildContext context) {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.7,
         minChildSize: 0.5,
         maxChildSize: 0.9,
         expand: false,
         builder: (context, scrollController) => _ViewMembersSheet(
-          team: _currentTeam,
-          scrollController: scrollController,
-        ),
+            team: _currentTeam, scrollController: scrollController),
       ),
     );
   }
 
-  // Add Members Dialog - Only for Team Leaders and Admins
   void _showAddMembersDialog(BuildContext context) {
+    debugPrint('🎯 Opening Add Members Dialog');
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
       builder: (context) => DraggableScrollableSheet(
         initialChildSize: 0.7,
         minChildSize: 0.5,
@@ -319,16 +265,6 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
     );
   }
 
-  void _showTeamInfo(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => _TeamInfoSheet(team: _currentTeam),
-    );
-  }
-
   @override
   void dispose() {
     _messageController.dispose();
@@ -337,16 +273,10 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
   }
 }
 
-// NEW: View Members Sheet - For ALL team members
 class _ViewMembersSheet extends StatefulWidget {
   final TeamModel team;
   final ScrollController scrollController;
-
-  const _ViewMembersSheet({
-    required this.team,
-    required this.scrollController,
-  });
-
+  const _ViewMembersSheet({required this.team, required this.scrollController});
   @override
   State<_ViewMembersSheet> createState() => _ViewMembersSheetState();
 }
@@ -364,29 +294,23 @@ class _ViewMembersSheetState extends State<_ViewMembersSheet> {
 
   Future<void> _loadMembers() async {
     try {
-      // Load leader
       final leaderDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(widget.team.leaderId)
           .get();
-
       if (leaderDoc.exists) {
         _leader = UserModel.fromMap(leaderDoc.data()!, leaderDoc.id);
       }
-
-      // Load members
       final membersList = <UserModel>[];
       for (String memberId in widget.team.memberIds) {
         final memberDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(memberId)
             .get();
-
         if (memberDoc.exists) {
           membersList.add(UserModel.fromMap(memberDoc.data()!, memberDoc.id));
         }
       }
-
       setState(() {
         _members = membersList;
         _isLoading = false;
@@ -407,9 +331,8 @@ class _ViewMembersSheetState extends State<_ViewMembersSheet> {
             width: 40,
             height: 5,
             decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2.5),
-            ),
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2.5)),
           ),
           const SizedBox(height: 20),
           Row(
@@ -417,69 +340,49 @@ class _ViewMembersSheetState extends State<_ViewMembersSheet> {
               const Icon(Icons.people, color: Color(0xFF1E293B)),
               const SizedBox(width: 12),
               Expanded(
-                child: Text(
-                  'Team Members (${widget.team.memberIds.length + 1})',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+                  child: Text(
+                      'Team Members (${widget.team.memberIds.length + 1})',
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.bold))),
             ],
           ),
           const SizedBox(height: 16),
-
-          // Members List
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : ListView(
                     controller: widget.scrollController,
                     children: [
-                      // Team Leader
                       if (_leader != null) ...[
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 8),
-                          child: Text(
-                            'Team Leader',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF64748B),
-                            ),
-                          ),
+                          child: Text('Team Leader',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF64748B))),
                         ),
                         _MemberCard(user: _leader!, isLeader: true),
                         const SizedBox(height: 16),
                       ],
-
-                      // Members
                       if (_members.isNotEmpty) ...[
                         const Padding(
                           padding: EdgeInsets.symmetric(vertical: 8),
-                          child: Text(
-                            'Members',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: Color(0xFF64748B),
-                            ),
-                          ),
+                          child: Text('Members',
+                              style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF64748B))),
                         ),
                         ..._members.map((member) => _MemberCard(user: member)),
                       ],
-
                       if (_members.isEmpty && _leader != null)
                         Center(
                           child: Padding(
                             padding: const EdgeInsets.all(32),
-                            child: Text(
-                              'No other members yet',
-                              style: TextStyle(
-                                color: Colors.grey[600],
-                                fontSize: 14,
-                              ),
-                            ),
+                            child: Text('No other members yet',
+                                style: TextStyle(
+                                    color: Colors.grey[600], fontSize: 14)),
                           ),
                         ),
                     ],
@@ -494,7 +397,6 @@ class _ViewMembersSheetState extends State<_ViewMembersSheet> {
 class _MemberCard extends StatelessWidget {
   final UserModel user;
   final bool isLeader;
-
   const _MemberCard({required this.user, this.isLeader = false});
 
   @override
@@ -507,10 +409,8 @@ class _MemberCard extends StatelessWidget {
             CircleAvatar(
               backgroundColor:
                   isLeader ? Colors.amber : const Color(0xFF1E293B),
-              child: Text(
-                user.username[0].toUpperCase(),
-                style: const TextStyle(color: Colors.white),
-              ),
+              child: Text(user.username[0].toUpperCase(),
+                  style: const TextStyle(color: Colors.white)),
             ),
             if (isLeader)
               Positioned(
@@ -519,22 +419,14 @@ class _MemberCard extends StatelessWidget {
                 child: Container(
                   padding: const EdgeInsets.all(2),
                   decoration: const BoxDecoration(
-                    color: Colors.white,
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.star,
-                    color: Colors.amber,
-                    size: 12,
-                  ),
+                      color: Colors.white, shape: BoxShape.circle),
+                  child: const Icon(Icons.star, color: Colors.amber, size: 12),
                 ),
               ),
           ],
         ),
-        title: Text(
-          user.displayName ?? user.username,
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
+        title: Text(user.displayName ?? user.username,
+            style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -577,18 +469,14 @@ class _MemberCard extends StatelessWidget {
   }
 }
 
-// Quick Add Members Sheet - For Team Leaders
 class _AddMembersSheet extends StatefulWidget {
   final TeamModel team;
   final ScrollController scrollController;
   final VoidCallback onMembersAdded;
-
-  const _AddMembersSheet({
-    required this.team,
-    required this.scrollController,
-    required this.onMembersAdded,
-  });
-
+  const _AddMembersSheet(
+      {required this.team,
+      required this.scrollController,
+      required this.onMembersAdded});
   @override
   State<_AddMembersSheet> createState() => _AddMembersSheetState();
 }
@@ -608,6 +496,7 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
 
   Future<void> _loadUsers() async {
     try {
+      debugPrint('📥 Loading available users...');
       final snapshot =
           await FirebaseFirestore.instance.collection('users').get();
       final users = snapshot.docs
@@ -616,14 +505,14 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
               user.uid != widget.team.leaderId &&
               !widget.team.memberIds.contains(user.uid))
           .toList();
-
+      debugPrint('✅ Found ${users.length} available users to add');
       setState(() {
         _allUsers = users;
         _filteredUsers = users;
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('Error loading users: $e');
+      debugPrint('❌ Error loading users: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -642,35 +531,44 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
 
   Future<void> _addSelectedMembers() async {
     if (_selectedUserIds.isEmpty) return;
-
     try {
+      debugPrint('➕ Adding ${_selectedUserIds.length} members...');
       final currentMembers = List<String>.from(widget.team.memberIds);
       currentMembers.addAll(_selectedUserIds);
-
       await FirebaseFirestore.instance
           .collection('teams')
           .doc(widget.team.id)
-          .update({'memberIds': currentMembers});
-
+          .update({
+        'memberIds': currentMembers,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      debugPrint('✅ Members added successfully');
       widget.onMembersAdded();
-
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content:
-                Text('${_selectedUserIds.length} member(s) added successfully'),
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Text(
+                        '${_selectedUserIds.length} member(s) added successfully')),
+              ],
+            ),
             backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }
     } catch (e) {
+      debugPrint('❌ Error adding members: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
+              content: Text('Error: ${e.toString()}'),
+              backgroundColor: Colors.red),
         );
       }
     }
@@ -686,35 +584,28 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
             width: 40,
             height: 5,
             decoration: BoxDecoration(
-              color: Colors.grey[300],
-              borderRadius: BorderRadius.circular(2.5),
-            ),
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2.5)),
           ),
           const SizedBox(height: 20),
           Row(
             children: [
               const Expanded(
-                child: Text(
-                  'Add Team Members',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
+                  child: Text('Add Team Members',
+                      style: TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.bold))),
               if (_selectedUserIds.isNotEmpty)
-                ElevatedButton(
+                ElevatedButton.icon(
                   onPressed: _addSelectedMembers,
+                  icon: const Icon(Icons.add),
+                  label: Text('Add (${_selectedUserIds.length})'),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF10B981),
-                  ),
-                  child: Text('Add (${_selectedUserIds.length})'),
+                      backgroundColor: const Color(0xFF10B981),
+                      foregroundColor: Colors.white),
                 ),
             ],
           ),
           const SizedBox(height: 16),
-
-          // Search
           TextField(
             controller: _searchController,
             onChanged: _filterUsers,
@@ -727,30 +618,38 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
                       onPressed: () {
                         _searchController.clear();
                         _filterUsers('');
-                      },
-                    )
+                      })
                   : null,
               filled: true,
               fillColor: const Color(0xFFF1F5F9),
               border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide.none,
-              ),
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none),
             ),
           ),
           const SizedBox(height: 16),
-
-          // Users List
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _filteredUsers.isEmpty
                     ? Center(
-                        child: Text(
-                          _searchController.text.isNotEmpty
-                              ? 'No users found'
-                              : 'All users are already members',
-                          style: TextStyle(color: Colors.grey[600]),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                                _searchController.text.isNotEmpty
+                                    ? Icons.search_off
+                                    : Icons.group_add,
+                                size: 80,
+                                color: Colors.grey[400]),
+                            const SizedBox(height: 16),
+                            Text(
+                                _searchController.text.isNotEmpty
+                                    ? 'No users found'
+                                    : 'All users are already members',
+                                style: TextStyle(
+                                    color: Colors.grey[600], fontSize: 16)),
+                          ],
                         ),
                       )
                     : ListView.builder(
@@ -760,7 +659,6 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
                           final user = _filteredUsers[index];
                           final isSelected =
                               _selectedUserIds.contains(user.uid);
-
                           return Card(
                             margin: const EdgeInsets.only(bottom: 8),
                             child: CheckboxListTile(
@@ -769,23 +667,23 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
                                 setState(() {
                                   if (value == true) {
                                     _selectedUserIds.add(user.uid);
+                                    debugPrint('✅ Selected: ${user.username}');
                                   } else {
                                     _selectedUserIds.remove(user.uid);
+                                    debugPrint(
+                                        '❌ Deselected: ${user.username}');
                                   }
                                 });
                               },
                               secondary: CircleAvatar(
                                 backgroundColor: const Color(0xFF1E293B),
-                                child: Text(
-                                  user.username[0].toUpperCase(),
-                                  style: const TextStyle(color: Colors.white),
-                                ),
+                                child: Text(user.username[0].toUpperCase(),
+                                    style:
+                                        const TextStyle(color: Colors.white)),
                               ),
-                              title: Text(
-                                user.displayName ?? user.username,
-                                style: const TextStyle(
-                                    fontWeight: FontWeight.w600),
-                              ),
+                              title: Text(user.displayName ?? user.username,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w600)),
                               subtitle: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -832,190 +730,8 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
   }
 }
 
-// Team Info Sheet
-class _TeamInfoSheet extends StatelessWidget {
-  final TeamModel team;
-
-  const _TeamInfoSheet({required this.team});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 5,
-              decoration: BoxDecoration(
-                color: Colors.grey[300],
-                borderRadius: BorderRadius.circular(2.5),
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Container(
-                width: 60,
-                height: 60,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF1E293B), Color(0xFF334155)],
-                  ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(
-                  Icons.groups,
-                  color: Colors.white,
-                  size: 32,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      team.name,
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Created ${_formatDate(team.createdAt)}',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          if (team.description.isNotEmpty) ...[
-            const Text(
-              'Description',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              team.description,
-              style: TextStyle(
-                fontSize: 14,
-                color: Colors.grey[700],
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 16),
-          ],
-          const Divider(),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              const Icon(Icons.people, color: Color(0xFF1E293B)),
-              const SizedBox(width: 12),
-              Text(
-                '${team.memberIds.length + 1} Members',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          FutureBuilder<DocumentSnapshot>(
-            future: FirebaseFirestore.instance
-                .collection('users')
-                .doc(team.leaderId)
-                .get(),
-            builder: (context, snapshot) {
-              if (!snapshot.hasData) return const SizedBox.shrink();
-
-              final leaderData = snapshot.data!.data() as Map<String, dynamic>?;
-              if (leaderData == null) return const SizedBox.shrink();
-
-              return Row(
-                children: [
-                  const Icon(Icons.star, color: Colors.amber),
-                  const SizedBox(width: 12),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Team Leader',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                      Text(
-                        leaderData['displayName'] ??
-                            leaderData['username'] ??
-                            'Unknown',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 24),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close),
-                  label: const Text('Close'),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatDate(DateTime date) {
-    final now = DateTime.now();
-    final difference = now.difference(date);
-
-    if (difference.inDays == 0) {
-      return 'today';
-    } else if (difference.inDays == 1) {
-      return 'yesterday';
-    } else if (difference.inDays < 7) {
-      return '${difference.inDays} days ago';
-    } else if (difference.inDays < 30) {
-      return '${(difference.inDays / 7).floor()} weeks ago';
-    } else if (difference.inDays < 365) {
-      return '${(difference.inDays / 30).floor()} months ago';
-    } else {
-      return '${(difference.inDays / 365).floor()} years ago';
-    }
-  }
-}
-
-// Date Separator Widget
 class _DateSeparator extends StatelessWidget {
   final DateTime date;
-
   const _DateSeparator({required this.date});
 
   @override
@@ -1027,14 +743,11 @@ class _DateSeparator extends StatelessWidget {
           Expanded(child: Divider(color: Colors.grey[300])),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Text(
-              _formatDate(date),
-              style: TextStyle(
-                fontSize: 12,
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
-              ),
-            ),
+            child: Text(_formatDate(date),
+                style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500)),
           ),
           Expanded(child: Divider(color: Colors.grey[300])),
         ],
@@ -1046,7 +759,6 @@ class _DateSeparator extends StatelessWidget {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final messageDate = DateTime(date.year, date.month, date.day);
-
     if (messageDate == today) {
       return 'Today';
     } else if (messageDate == today.subtract(const Duration(days: 1))) {
@@ -1059,17 +771,12 @@ class _DateSeparator extends StatelessWidget {
   }
 }
 
-// Message Bubble Widget
 class _MessageBubble extends StatelessWidget {
   final MessageModel message;
   final bool isMe;
   final bool showSender;
-
-  const _MessageBubble({
-    required this.message,
-    required this.isMe,
-    required this.showSender,
-  });
+  const _MessageBubble(
+      {required this.message, required this.isMe, required this.showSender});
 
   @override
   Widget build(BuildContext context) {
@@ -1084,22 +791,18 @@ class _MessageBubble extends StatelessWidget {
             CircleAvatar(
               radius: 16,
               backgroundColor: const Color(0xFF1E293B),
-              child: Text(
-                message.senderName[0].toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              child: Text(message.senderName[0].toUpperCase(),
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold)),
             ),
             const SizedBox(width: 8),
           ],
           Flexible(
             child: Container(
               constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.7,
-              ),
+                  maxWidth: MediaQuery.of(context).size.width * 0.7),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
               decoration: BoxDecoration(
                 color: isMe ? const Color(0xFF1E293B) : Colors.white,
@@ -1111,10 +814,9 @@ class _MessageBubble extends StatelessWidget {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
-                    blurRadius: 5,
-                    offset: const Offset(0, 2),
-                  ),
+                      color: Colors.black.withOpacity(0.05),
+                      blurRadius: 5,
+                      offset: const Offset(0, 2)),
                 ],
               ),
               child: Column(
@@ -1123,31 +825,22 @@ class _MessageBubble extends StatelessWidget {
                   if (!isMe && showSender)
                     Padding(
                       padding: const EdgeInsets.only(bottom: 4),
-                      child: Text(
-                        message.senderName,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF1E293B),
-                        ),
-                      ),
+                      child: Text(message.senderName,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1E293B))),
                     ),
-                  Text(
-                    message.content,
-                    style: TextStyle(
-                      fontSize: 15,
-                      color: isMe ? Colors.white : const Color(0xFF1E293B),
-                      height: 1.4,
-                    ),
-                  ),
+                  Text(message.content,
+                      style: TextStyle(
+                          fontSize: 15,
+                          color: isMe ? Colors.white : const Color(0xFF1E293B),
+                          height: 1.4)),
                   const SizedBox(height: 4),
-                  Text(
-                    DateFormat('h:mm a').format(message.timestamp),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: isMe ? Colors.white70 : Colors.grey[500],
-                    ),
-                  ),
+                  Text(DateFormat('h:mm a').format(message.timestamp),
+                      style: TextStyle(
+                          fontSize: 11,
+                          color: isMe ? Colors.white70 : Colors.grey[500])),
                 ],
               ),
             ),
@@ -1158,15 +851,10 @@ class _MessageBubble extends StatelessWidget {
   }
 }
 
-// Message Input Widget
 class _MessageInput extends StatefulWidget {
   final TextEditingController controller;
   final VoidCallback onSend;
-
-  const _MessageInput({
-    required this.controller,
-    required this.onSend,
-  });
+  const _MessageInput({required this.controller, required this.onSend});
 
   @override
   State<_MessageInput> createState() => _MessageInputState();
@@ -1198,10 +886,9 @@ class _MessageInputState extends State<_MessageInput> {
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
-            offset: const Offset(0, -5),
-          ),
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, -5)),
         ],
       ),
       child: SafeArea(
@@ -1211,18 +898,15 @@ class _MessageInputState extends State<_MessageInput> {
             Expanded(
               child: Container(
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(24),
-                ),
+                    color: const Color(0xFFF1F5F9),
+                    borderRadius: BorderRadius.circular(24)),
                 child: TextField(
                   controller: widget.controller,
                   decoration: const InputDecoration(
                     hintText: 'Type a message...',
                     border: InputBorder.none,
-                    contentPadding: EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
+                    contentPadding:
+                        EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                   ),
                   maxLines: 5,
                   minLines: 1,
@@ -1237,18 +921,15 @@ class _MessageInputState extends State<_MessageInput> {
               decoration: BoxDecoration(
                 gradient: _canSend
                     ? const LinearGradient(
-                        colors: [Color(0xFF1E293B), Color(0xFF334155)],
-                      )
+                        colors: [Color(0xFF1E293B), Color(0xFF334155)])
                     : null,
                 color: _canSend ? null : Colors.grey[300],
                 shape: BoxShape.circle,
               ),
               child: IconButton(
                 onPressed: _canSend ? widget.onSend : null,
-                icon: Icon(
-                  Icons.send,
-                  color: _canSend ? Colors.white : Colors.grey[600],
-                ),
+                icon: Icon(Icons.send,
+                    color: _canSend ? Colors.white : Colors.grey[600]),
               ),
             ),
           ],
