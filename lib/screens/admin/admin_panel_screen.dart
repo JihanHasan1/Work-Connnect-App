@@ -3,6 +3,10 @@ import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chatbot_provider.dart';
+import '../chatbot/issues_management_screen.dart';
+import '../chatbot/issues_management_screen.dart';
+import '../../models/issue_model.dart';
+import 'package:intl/intl.dart';
 
 class AdminPanelScreen extends StatelessWidget {
   const AdminPanelScreen({Key? key}) : super(key: key);
@@ -10,7 +14,7 @@ class AdminPanelScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 4, // Changed from 3 to 4
       child: Scaffold(
         appBar: PreferredSize(
           preferredSize: const Size.fromHeight(48),
@@ -22,6 +26,7 @@ class AdminPanelScreen extends StatelessWidget {
                 Tab(text: 'Users'),
                 Tab(text: 'Teams'),
                 Tab(text: 'ChatBot'),
+                Tab(text: 'Issues'), // New tab
               ],
             ),
           ),
@@ -31,6 +36,7 @@ class AdminPanelScreen extends StatelessWidget {
             _UsersTab(),
             _TeamsTab(),
             _ChatbotTab(),
+            _IssuesTab(), // New tab content
           ],
         ),
       ),
@@ -1085,6 +1091,172 @@ class _BotResponseCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _IssuesTab extends StatelessWidget {
+  const _IssuesTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Chatbot Issues',
+                  style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+                ),
+              ),
+              Consumer<ChatbotProvider>(
+                builder: (context, provider, child) {
+                  return StreamBuilder<int>(
+                    stream: provider.getPendingIssuesCount(),
+                    builder: (context, snapshot) {
+                      final count = snapshot.data ?? 0;
+                      if (count == 0) return const SizedBox.shrink();
+
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.red,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Text(
+                          '$count Pending',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+              const SizedBox(width: 12),
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const IssuesManagementScreen(),
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.open_in_new),
+                label: const Text('Manage Issues'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF10B981),
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Consumer<ChatbotProvider>(
+            builder: (context, provider, child) {
+              return StreamBuilder<List<IssueModel>>(
+                stream: provider.getPendingIssues(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.check_circle_outline,
+                              size: 80, color: Colors.grey[400]),
+                          const SizedBox(height: 16),
+                          Text(
+                            'No pending issues',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'All chatbot questions have been answered!',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[500],
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final issues = snapshot.data!;
+                  return ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: issues.length,
+                    itemBuilder: (context, index) {
+                      final issue = issues[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: ListTile(
+                          leading: CircleAvatar(
+                            backgroundColor: const Color(0xFF10B981),
+                            child: Text(
+                              issue.userName[0].toUpperCase(),
+                              style: const TextStyle(color: Colors.white),
+                            ),
+                          ),
+                          title: Text(
+                            issue.question,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 4),
+                              Text('Asked by ${issue.userName}'),
+                              const SizedBox(height: 2),
+                              Text(
+                                DateFormat('MMM dd, yyyy • h:mm a')
+                                    .format(issue.createdAt),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const IssuesManagementScreen(),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

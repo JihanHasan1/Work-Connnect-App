@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chatbot_provider.dart';
 import '../../models/issue_model.dart';
+import '../chatbot/issues_management_screen.dart';
 
 class ChatbotScreen extends StatefulWidget {
   const ChatbotScreen({Key? key}) : super(key: key);
@@ -16,94 +17,40 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
   final _messageController = TextEditingController();
   final _scrollController = ScrollController();
   final List<ChatMessage> _messages = [];
+  bool _isTyping = false;
 
   @override
   void initState() {
     super.initState();
-    Future.microtask(() => context.read<ChatbotProvider>().loadBotKnowledge());
-    _addMessage(
-      'Hello! I\'m your ChatBot assistant. Ask me anything about workplace policies, procedures, or any other questions.',
-      isBot: true,
-    );
+    Future.microtask(() {
+      context.read<ChatbotProvider>().loadBotKnowledge();
+      _addMessage(
+        'Hello! 👋 I\'m your Chatbot Assistant. I can help you with?\n',
+        isBot: true,
+      );
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    final auth = context.watch<AuthProvider>();
+
     return Scaffold(
       body: Column(
         children: [
           // Bot Header
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
-                  blurRadius: 5,
-                  offset: const Offset(0, 2),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 48,
-                  height: 48,
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF10B981), Color(0xFF059669)],
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: const Icon(
-                    Icons.smart_toy,
-                    color: Colors.white,
-                    size: 24,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                const Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'ChatBot Assistant',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Color(0xFF1E293B),
-                        ),
-                      ),
-                      Text(
-                        'Always here to help',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Color(0xFF64748B),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: Color(0xFF10B981),
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              ],
-            ),
-          ),
+          _buildHeader(),
 
           // Messages
           Expanded(
             child: ListView.builder(
               controller: _scrollController,
               padding: const EdgeInsets.all(16),
-              itemCount: _messages.length,
+              itemCount: _messages.length + (_isTyping ? 1 : 0),
               itemBuilder: (context, index) {
+                if (index == _messages.length && _isTyping) {
+                  return _buildTypingIndicator();
+                }
                 final message = _messages[index];
                 return _ChatBubble(message: message);
               },
@@ -117,6 +64,184 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
           ),
         ],
       ),
+      // Add FAB for Team Leaders
+      floatingActionButton: auth.isTeamLeader
+          ? Consumer<ChatbotProvider>(
+              builder: (context, provider, child) {
+                return StreamBuilder<int>(
+                  stream: provider.getPendingIssuesCount(),
+                  builder: (context, snapshot) {
+                    final count = snapshot.data ?? 0;
+
+                    return FloatingActionButton.extended(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const IssuesManagementScreen(),
+                          ),
+                        );
+                      },
+                      icon: Badge(
+                        label: Text('$count'),
+                        isLabelVisible: count > 0,
+                        child: const Icon(Icons.question_answer),
+                      ),
+                      label: Text(count > 0 ? 'Pending Issues' : 'Issues'),
+                      backgroundColor:
+                          count > 0 ? Colors.red : const Color(0xFF10B981),
+                    );
+                  },
+                );
+              },
+            )
+          : null,
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 5,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF10B981), Color(0xFF059669)],
+              ),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(
+              Icons.smart_toy,
+              color: Colors.white,
+              size: 24,
+            ),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'ChatBot',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+                Text(
+                  'Get Your Answers Instantly !',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF64748B),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: Color(0xFF10B981),
+              shape: BoxShape.circle,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTypingIndicator() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF10B981), Color(0xFF059669)],
+              ),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.smart_toy,
+              color: Colors.white,
+              size: 18,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(16),
+                topRight: Radius.circular(16),
+                bottomLeft: Radius.circular(4),
+                bottomRight: Radius.circular(16),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.05),
+                  blurRadius: 5,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildTypingDot(0),
+                const SizedBox(width: 4),
+                _buildTypingDot(200),
+                const SizedBox(width: 4),
+                _buildTypingDot(400),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTypingDot(int delay) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.0, end: 1.0),
+      duration: const Duration(milliseconds: 600),
+      builder: (context, value, child) {
+        return Opacity(
+          opacity: (value * 2) % 1.0,
+          child: Container(
+            width: 8,
+            height: 8,
+            decoration: const BoxDecoration(
+              color: Color(0xFF10B981),
+              shape: BoxShape.circle,
+            ),
+          ),
+        );
+      },
+      onEnd: () {
+        if (mounted) setState(() {});
+      },
     );
   }
 
@@ -150,17 +275,31 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     _addMessage(userMessage, isBot: false);
     _messageController.clear();
 
-    // Simulate typing delay
-    await Future.delayed(const Duration(milliseconds: 500));
+    // Show typing indicator
+    setState(() => _isTyping = true);
+    await Future.delayed(const Duration(milliseconds: 800));
+    setState(() => _isTyping = false);
 
     final botProvider = context.read<ChatbotProvider>();
     final response = botProvider.getBotResponse(userMessage);
 
     if (response != null) {
       _addMessage(response, isBot: true);
+
+      // Add helpful follow-up
+      await Future.delayed(const Duration(milliseconds: 500));
+      setState(() => _isTyping = true);
+      await Future.delayed(const Duration(milliseconds: 600));
+      setState(() => _isTyping = false);
+
+      _addMessage(
+        'Was this helpful? Feel free to ask more questions! 😊',
+        isBot: true,
+      );
     } else {
       _addMessage(
-        'I don\'t have an answer for that. Let me notify a team leader to help you.',
+        'I don\'t have an answer for that specific question. 🤔\n\n'
+        'Let me forward this to a team leader who can help you better!',
         isBot: true,
       );
 
@@ -174,12 +313,27 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         status: 'pending',
         createdAt: DateTime.now(),
       );
-      await botProvider.createIssue(issue);
 
-      _addMessage(
-        'Your question has been forwarded to a team leader. You\'ll receive a response soon!',
-        isBot: true,
-      );
+      try {
+        await botProvider.createIssue(issue);
+
+        await Future.delayed(const Duration(milliseconds: 400));
+        setState(() => _isTyping = true);
+        await Future.delayed(const Duration(milliseconds: 600));
+        setState(() => _isTyping = false);
+
+        _addMessage(
+          '✅ Your question has been forwarded to our team leaders.\n\n'
+          'They will review it and add the answer to my knowledge base. '
+          'You can ask me again later! 🎯',
+          isBot: true,
+        );
+      } catch (e) {
+        _addMessage(
+          '❌ Sorry, I couldn\'t forward your question. Please try again or contact support directly.',
+          isBot: true,
+        );
+      }
     }
   }
 
@@ -285,7 +439,7 @@ class _ChatBubble extends StatelessWidget {
   }
 }
 
-class _MessageInput extends StatelessWidget {
+class _MessageInput extends StatefulWidget {
   final TextEditingController controller;
   final VoidCallback onSend;
 
@@ -293,6 +447,26 @@ class _MessageInput extends StatelessWidget {
     required this.controller,
     required this.onSend,
   });
+
+  @override
+  State<_MessageInput> createState() => _MessageInputState();
+}
+
+class _MessageInputState extends State<_MessageInput> {
+  bool _canSend = false;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_checkCanSend);
+  }
+
+  void _checkCanSend() {
+    final canSend = widget.controller.text.trim().isNotEmpty;
+    if (canSend != _canSend) {
+      setState(() => _canSend = canSend);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -313,9 +487,9 @@ class _MessageInput extends StatelessWidget {
           children: [
             Expanded(
               child: TextField(
-                controller: controller,
+                controller: widget.controller,
                 decoration: InputDecoration(
-                  hintText: 'Ask a question...',
+                  hintText: 'Ask me anything...',
                   filled: true,
                   fillColor: const Color(0xFFF1F5F9),
                   border: OutlineInputBorder(
@@ -330,24 +504,35 @@ class _MessageInput extends StatelessWidget {
                 maxLines: 5,
                 minLines: 1,
                 textCapitalization: TextCapitalization.sentences,
+                onSubmitted: _canSend ? (_) => widget.onSend() : null,
               ),
             ),
             const SizedBox(width: 12),
-            Container(
-              decoration: const BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [Color(0xFF10B981), Color(0xFF059669)],
-                ),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              decoration: BoxDecoration(
+                gradient: _canSend
+                    ? const LinearGradient(
+                        colors: [Color(0xFF10B981), Color(0xFF059669)])
+                    : null,
+                color: _canSend ? null : Colors.grey[300],
                 shape: BoxShape.circle,
               ),
               child: IconButton(
-                onPressed: onSend,
-                icon: const Icon(Icons.send, color: Colors.white),
+                onPressed: _canSend ? widget.onSend : null,
+                icon: Icon(Icons.send,
+                    color: _canSend ? Colors.white : Colors.grey[600]),
               ),
             ),
           ],
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_checkCanSend);
+    super.dispose();
   }
 }

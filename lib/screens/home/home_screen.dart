@@ -8,6 +8,8 @@ import '../chatbot/chatbot_screen.dart';
 import '../admin/admin_panel_screen.dart';
 import '../profile/profile_screen.dart';
 import '../settings/settings_screen.dart';
+import '../chatbot/issues_management_screen.dart';
+import '../../providers/chatbot_provider.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -209,9 +211,24 @@ class _HomeScreenState extends State<HomeScreen>
               selectedIcon: Icon(Icons.help),
               label: 'FAQ',
             ),
-            const NavigationDestination(
-              icon: Icon(Icons.smart_toy_outlined),
-              selectedIcon: Icon(Icons.smart_toy),
+            NavigationDestination(
+              icon: Consumer<ChatbotProvider>(
+                builder: (context, chatbotProvider, child) {
+                  return StreamBuilder<int>(
+                    stream: chatbotProvider.getPendingIssuesCount(),
+                    builder: (context, snapshot) {
+                      final count = snapshot.data ?? 0;
+
+                      return Badge(
+                        label: Text('$count'),
+                        isLabelVisible: count > 0 && auth.isTeamLeader,
+                        child: const Icon(Icons.smart_toy_outlined),
+                      );
+                    },
+                  );
+                },
+              ),
+              selectedIcon: const Icon(Icons.smart_toy),
               label: 'ChatBot',
             ),
             if (auth.isAdmin)
