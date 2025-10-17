@@ -67,7 +67,7 @@ class ChatbotProvider extends ChangeNotifier {
     }
   }
 
-  // Enhanced bot response with FAQ integration and fuzzy matching
+  // Enhanced bot response with FAQ integration and improved fuzzy matching
   String? getBotResponse(String question) {
     final lowerQuestion = question.toLowerCase().trim();
 
@@ -85,73 +85,110 @@ class ChatbotProvider extends ChangeNotifier {
       }
     }
 
-    // 3. Partial match in chatbot knowledge (contains any keyword)
-    final questionWords =
-        lowerQuestion.split(' ').where((w) => w.length > 3).toList();
+    // 3. Improved fuzzy matching - check for significant keyword overlap
+    // Extract meaningful keywords (words longer than 3 characters)
+    final questionWords = lowerQuestion
+        .split(RegExp(r'\s+'))
+        .where((w) => w.length > 3)
+        .map((w) => w.toLowerCase())
+        .toSet();
+
+    if (questionWords.isEmpty) {
+      debugPrint('❌ No meaningful keywords found in question');
+      return null;
+    }
+
+    // Search in chatbot knowledge with stricter matching
+    String? bestMatch;
+    double bestScore = 0.0;
 
     for (var entry in _botKnowledge.entries) {
-      final keyWords = entry.key.split(' ');
-      int matchCount = 0;
+      final knowledgeWords = entry.key
+          .split(RegExp(r'\s+'))
+          .where((w) => w.length > 3)
+          .map((w) => w.toLowerCase())
+          .toSet();
 
-      for (var qWord in questionWords) {
-        for (var kWord in keyWords) {
-          if (kWord.contains(qWord) || qWord.contains(kWord)) {
-            matchCount++;
-          }
-        }
-      }
+      if (knowledgeWords.isEmpty) continue;
 
-      // If at least 50% of words match
-      if (matchCount >= (questionWords.length * 0.5)) {
-        debugPrint(
-            '✅ Partial match found in chatbot: $matchCount/${questionWords.length} words');
-        return entry.value;
+      // Calculate Jaccard similarity (intersection / union)
+      final intersection = questionWords.intersection(knowledgeWords).length;
+      final union = questionWords.union(knowledgeWords).length;
+      final similarity = intersection / union;
+
+      // Require at least 60% similarity AND at least 2 matching words
+      if (similarity > bestScore && similarity >= 0.6 && intersection >= 2) {
+        bestScore = similarity;
+        bestMatch = entry.value;
       }
     }
 
-    // 4. Partial match in FAQs
+    if (bestMatch != null) {
+      debugPrint(
+          '✅ Fuzzy match found in chatbot (score: ${(bestScore * 100).toStringAsFixed(1)}%)');
+      return bestMatch;
+    }
+
+    // Search in FAQs with same stricter matching
+    bestMatch = null;
+    bestScore = 0.0;
+
     for (var faq in _faqs) {
       final faqWords = faq.question
           .toLowerCase()
-          .split(' ')
+          .split(RegExp(r'\s+'))
           .where((w) => w.length > 3)
-          .toList();
-      int matchCount = 0;
+          .map((w) => w.toLowerCase())
+          .toSet();
 
-      for (var qWord in questionWords) {
-        for (var fWord in faqWords) {
-          if (fWord.contains(qWord) || qWord.contains(fWord)) {
-            matchCount++;
-          }
-        }
-      }
+      if (faqWords.isEmpty) continue;
 
-      // If at least 40% of words match (FAQs are more general)
-      if (matchCount >= (questionWords.length * 0.4)) {
-        debugPrint(
-            '✅ Partial match found in FAQs: $matchCount/${questionWords.length} words');
-        return faq.answer;
+      final intersection = questionWords.intersection(faqWords).length;
+      final union = questionWords.union(faqWords).length;
+      final similarity = intersection / union;
+
+      // Slightly lower threshold for FAQs (50%) but still require 2 matching words
+      if (similarity > bestScore && similarity >= 0.5 && intersection >= 2) {
+        bestScore = similarity;
+        bestMatch = faq.answer;
       }
     }
 
-    // 5. Check for common keywords
+    if (bestMatch != null) {
+      debugPrint(
+          '✅ Fuzzy match found in FAQs (score: ${(bestScore * 100).toStringAsFixed(1)}%)');
+      return bestMatch;
+    }
+
+    // 4. Check for common single keywords only as last resort
     final commonKeywords = {
       'leave':
           'For leave-related queries, please check the Leave Policy in FAQs or contact HR.',
       'salary':
           'For salary-related queries, please contact the HR department directly.',
+      'pay':
+          'For payment-related queries, please contact the HR department directly.',
       'password':
           'For password reset, please contact IT support or use the password reset link.',
+      'login':
+          'For login issues, please contact IT support or check your credentials.',
       'benefits':
           'For information about benefits, please check the Employee Benefits section in FAQs.',
       'holiday':
           'For holiday schedules, please check the Company Calendar in FAQs.',
+      'vacation':
+          'For vacation policies, please check the Leave Policy in FAQs.',
+      'sick':
+          'For sick leave information, please check the Leave Policy in FAQs or contact HR.',
     };
 
-    for (var keyword in commonKeywords.keys) {
-      if (lowerQuestion.contains(keyword)) {
-        debugPrint('✅ Keyword match found: $keyword');
-        return commonKeywords[keyword];
+    // Only check single keywords if the question is very short (4 words or less)
+    if (lowerQuestion.split(RegExp(r'\s+')).length <= 4) {
+      for (var keyword in commonKeywords.keys) {
+        if (lowerQuestion.contains(keyword)) {
+          debugPrint('✅ Single keyword match found: $keyword');
+          return commonKeywords[keyword];
+        }
       }
     }
 
@@ -178,6 +215,7 @@ class ChatbotProvider extends ChangeNotifier {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
+      debugPrint('📊 Pending issues count: ${snapshot.docs.length}');
       return snapshot.docs
           .map((doc) => IssueModel.fromMap(doc.data(), doc.id))
           .toList();
@@ -243,6 +281,9 @@ class ChatbotProvider extends ChangeNotifier {
         .collection('issues')
         .where('status', isEqualTo: 'pending')
         .snapshots()
-        .map((snapshot) => snapshot.docs.length);
+        .map((snapshot) {
+      debugPrint('📊 Badge count: ${snapshot.docs.length}');
+      return snapshot.docs.length;
+    });
   }
 }

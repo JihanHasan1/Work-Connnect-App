@@ -52,13 +52,15 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
         _currentTeam.leaderId == auth.currentUser?.uid ||
         _currentTeam.memberIds.contains(auth.currentUser?.uid);
 
-    final canManageMembers =
+    final isLeader =
         auth.isAdmin || _currentTeam.leaderId == auth.currentUser?.uid;
 
-    debugPrint('🔍 Current User ID: ${auth.currentUser?.uid}');
-    debugPrint('🔍 Team Leader ID: ${_currentTeam.leaderId}');
-    debugPrint('🔍 Is Admin: ${auth.isAdmin}');
-    debugPrint('🔍 Can Manage Members: $canManageMembers');
+    // Calculate exact member count (leader + members, avoiding duplicates)
+    final uniqueMemberIds = <String>{
+      _currentTeam.leaderId,
+      ..._currentTeam.memberIds,
+    };
+    final exactMemberCount = uniqueMemberIds.length;
 
     if (!isMember) {
       return Scaffold(
@@ -95,7 +97,7 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(_currentTeam.name),
-            Text('${_currentTeam.memberIds.length + 1} members',
+            Text('$exactMemberCount members',
                 style: const TextStyle(fontSize: 12)),
           ],
         ),
@@ -105,15 +107,47 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
             onPressed: () => _showViewMembersDialog(context),
             tooltip: 'View Members',
           ),
-          if (canManageMembers)
+          // Add Members button for team leaders
+          if (isLeader)
             IconButton(
               icon: const Icon(Icons.person_add),
-              onPressed: () {
-                debugPrint('➕ Add Members button tapped');
-                _showAddMembersDialog(context);
-              },
+              onPressed: () => _showAddMembersDialog(context),
               tooltip: 'Add Members',
             ),
+          // More options menu
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert),
+            onSelected: (value) {
+              if (value == 'team_info') {
+                _showTeamInfoDialog(context);
+              } else if (value == 'add_members' && isLeader) {
+                _showAddMembersDialog(context);
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'team_info',
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 20),
+                    SizedBox(width: 12),
+                    Text('Team Info'),
+                  ],
+                ),
+              ),
+              if (isLeader)
+                const PopupMenuItem(
+                  value: 'add_members',
+                  child: Row(
+                    children: [
+                      Icon(Icons.person_add, size: 20),
+                      SizedBox(width: 12),
+                      Text('Add Members'),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
       body: Column(
@@ -227,6 +261,76 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
     }
   }
 
+  void _showTeamInfoDialog(BuildContext context) {
+    // Calculate exact member count
+    final uniqueMemberIds = <String>{
+      _currentTeam.leaderId,
+      ..._currentTeam.memberIds,
+    };
+    final exactMemberCount = uniqueMemberIds.length;
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF1E293B), Color(0xFF334155)],
+                ),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Icon(Icons.groups, color: Colors.white, size: 24),
+            ),
+            const SizedBox(width: 12),
+            const Text('Team Information'),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _InfoRow(
+                  icon: Icons.group,
+                  label: 'Team Name',
+                  value: _currentTeam.name),
+              const SizedBox(height: 12),
+              _InfoRow(
+                icon: Icons.description,
+                label: 'Description',
+                value: _currentTeam.description.isNotEmpty
+                    ? _currentTeam.description
+                    : 'No description',
+              ),
+              const SizedBox(height: 12),
+              _InfoRow(
+                icon: Icons.people,
+                label: 'Total Members',
+                value: '$exactMemberCount',
+              ),
+              const SizedBox(height: 12),
+              _InfoRow(
+                icon: Icons.calendar_today,
+                label: 'Created',
+                value:
+                    DateFormat('MMM dd, yyyy').format(_currentTeam.createdAt),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _showViewMembersDialog(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -272,6 +376,54 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
     super.dispose();
   }
 }
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: const Color(0xFF64748B)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// Keep all your existing classes: _ViewMembersSheet, _MemberCard, _AddMembersSheet,
+// _DateSeparator, _MessageBubble, _MessageInput
 
 class _ViewMembersSheet extends StatefulWidget {
   final TeamModel team;
@@ -323,6 +475,13 @@ class _ViewMembersSheetState extends State<_ViewMembersSheet> {
 
   @override
   Widget build(BuildContext context) {
+    // Calculate exact member count
+    final uniqueMemberIds = <String>{
+      widget.team.leaderId,
+      ...widget.team.memberIds,
+    };
+    final exactMemberCount = uniqueMemberIds.length;
+
     return Container(
       padding: const EdgeInsets.all(24),
       child: Column(
@@ -340,8 +499,7 @@ class _ViewMembersSheetState extends State<_ViewMembersSheet> {
               const Icon(Icons.people, color: Color(0xFF1E293B)),
               const SizedBox(width: 12),
               Expanded(
-                  child: Text(
-                      'Team Members (${widget.team.memberIds.length + 1})',
+                  child: Text('Team Members ($exactMemberCount)',
                       style: const TextStyle(
                           fontSize: 20, fontWeight: FontWeight.bold))),
             ],

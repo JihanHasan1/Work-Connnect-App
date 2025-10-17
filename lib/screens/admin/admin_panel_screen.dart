@@ -4,9 +4,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chatbot_provider.dart';
 import '../chatbot/issues_management_screen.dart';
-import '../chatbot/issues_management_screen.dart';
+import 'chatbot_training_screen.dart';
 import '../../models/issue_model.dart';
 import 'package:intl/intl.dart';
+import 'chatbot_training_screen.dart';
 
 class AdminPanelScreen extends StatelessWidget {
   const AdminPanelScreen({Key? key}) : super(key: key);
@@ -14,7 +15,7 @@ class AdminPanelScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 4, // Changed from 3 to 4
+      length: 5, // Changed from 4 to 5
       child: Scaffold(
         appBar: PreferredSize(
           preferredSize: const Size.fromHeight(48),
@@ -25,8 +26,9 @@ class AdminPanelScreen extends StatelessWidget {
               tabs: [
                 Tab(text: 'Users'),
                 Tab(text: 'Teams'),
+                Tab(text: 'Train Bot'), // New tab
                 Tab(text: 'ChatBot'),
-                Tab(text: 'Issues'), // New tab
+                Tab(text: 'Issues'),
               ],
             ),
           ),
@@ -35,11 +37,232 @@ class AdminPanelScreen extends StatelessWidget {
           children: [
             _UsersTab(),
             _TeamsTab(),
+            _TrainBotTab(), // New tab content
             _ChatbotTab(),
-            _IssuesTab(), // New tab content
+            _IssuesTab(),
           ],
         ),
       ),
+    );
+  }
+}
+
+// New Training Tab
+class _TrainBotTab extends StatelessWidget {
+  const _TrainBotTab();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Color(0xFF10B981), Color(0xFF059669)],
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.psychology,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'ChatBot Training',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Teach the bot to answer employee questions',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Color(0xFF64748B),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      const Color(0xFF10B981).withOpacity(0.1),
+                      const Color(0xFF059669).withOpacity(0.05),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFF10B981).withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.lightbulb_outline,
+                      color: Color(0xFF10B981),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Train your chatbot by adding question-answer pairs. The bot learns to understand and respond to employee queries automatically.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[700],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        const Color(0xFF10B981).withOpacity(0.2),
+                        const Color(0xFF059669).withOpacity(0.1),
+                      ],
+                    ),
+                    shape: BoxShape.circle,
+                  ),
+                  child: const Icon(
+                    Icons.smart_toy,
+                    size: 60,
+                    color: Color(0xFF10B981),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'Ready to Train Your Bot?',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF1E293B),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Click the button below to start training',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => const ChatbotTrainingScreen(),
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.school),
+                  label: const Text('Open Training Interface'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF10B981),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                TextButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Color(0xFF10B981)),
+                            SizedBox(width: 12),
+                            Text('Quick Tips'),
+                          ],
+                        ),
+                        content: const SingleChildScrollView(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                '✨ Best Practices:',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              SizedBox(height: 12),
+                              Text('• Use clear, natural questions'),
+                              Text('• Provide complete, helpful answers'),
+                              Text('• Test your bot regularly'),
+                              Text('• Update knowledge as needed'),
+                              Text('• Monitor pending issues for gaps'),
+                              SizedBox(height: 16),
+                              Text(
+                                '🎯 The bot uses smart matching to understand similar questions automatically!',
+                                style: TextStyle(
+                                  fontStyle: FontStyle.italic,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        actions: [
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Got it!'),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                  icon: const Icon(Icons.help_outline),
+                  label: const Text('View Training Guide'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF10B981),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -55,7 +278,7 @@ class _UsersTab extends StatefulWidget {
 class _UsersTabState extends State<_UsersTab> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
-  String _sortBy = 'name'; // 'name', 'username', 'role', 'created'
+  String _sortBy = 'name';
 
   @override
   void dispose() {
@@ -70,7 +293,6 @@ class _UsersTabState extends State<_UsersTab> {
       return {'id': doc.id, ...data};
     }).toList();
 
-    // Filter by search
     if (_searchQuery.isNotEmpty) {
       users = users.where((user) {
         final displayName =
@@ -81,7 +303,6 @@ class _UsersTabState extends State<_UsersTab> {
       }).toList();
     }
 
-    // Sort
     users.sort((a, b) {
       switch (_sortBy) {
         case 'name':
@@ -112,7 +333,6 @@ class _UsersTabState extends State<_UsersTab> {
   Widget build(BuildContext context) {
     return Column(
       children: [
-        // Header with Add Button
         Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -138,8 +358,6 @@ class _UsersTabState extends State<_UsersTab> {
             ],
           ),
         ),
-
-        // Search Bar
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: TextField(
@@ -163,8 +381,6 @@ class _UsersTabState extends State<_UsersTab> {
           ),
         ),
         const SizedBox(height: 8),
-
-        // Sort Options
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: Row(
@@ -204,8 +420,6 @@ class _UsersTabState extends State<_UsersTab> {
           ),
         ),
         const SizedBox(height: 16),
-
-        // Users List
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
             stream: FirebaseFirestore.instance.collection('users').snapshots(),
@@ -393,7 +607,6 @@ class _SortChip extends StatelessWidget {
   }
 }
 
-// Enhanced User Card with Edit functionality
 class _UserCard extends StatelessWidget {
   final String userId;
   final Map<String, dynamic> userData;
@@ -455,110 +668,8 @@ class _UserCard extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: const Icon(Icons.edit, color: Color(0xFF1E293B)),
-              onPressed: () => _showEditUserDialog(context, userId, userData),
-            ),
-            IconButton(
               icon: const Icon(Icons.delete, color: Colors.red),
               onPressed: () => _showDeleteConfirmation(context, userId),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  static void _showEditUserDialog(
-      BuildContext context, String userId, Map<String, dynamic> userData) {
-    final displayNameController =
-        TextEditingController(text: userData['displayName']);
-    final usernameController =
-        TextEditingController(text: userData['username']);
-    final passwordController =
-        TextEditingController(text: userData['password']);
-    String selectedRole = userData['role'] ?? 'team_member';
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Edit User'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: displayNameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Full Name',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: usernameController,
-                  decoration: const InputDecoration(
-                    labelText: 'Username',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: passwordController,
-                  decoration: const InputDecoration(
-                    labelText: 'Password',
-                    border: OutlineInputBorder(),
-                  ),
-                  obscureText: true,
-                ),
-                const SizedBox(height: 16),
-                DropdownButtonFormField<String>(
-                  value: selectedRole,
-                  decoration: const InputDecoration(
-                    labelText: 'Role',
-                    border: OutlineInputBorder(),
-                  ),
-                  items: const [
-                    DropdownMenuItem(
-                        value: 'team_member', child: Text('Team Member')),
-                    DropdownMenuItem(
-                        value: 'team_leader', child: Text('Team Leader')),
-                  ],
-                  onChanged: (value) => setState(() => selectedRole = value!),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () async {
-                await FirebaseFirestore.instance
-                    .collection('users')
-                    .doc(userId)
-                    .update({
-                  'displayName': displayNameController.text,
-                  'username': usernameController.text,
-                  'password': passwordController.text,
-                  'role': selectedRole,
-                  'updatedAt': DateTime.now().toIso8601String(),
-                });
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('User updated successfully'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1E293B)),
-              child: const Text('Save'),
             ),
           ],
         ),

@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/chatbot_provider.dart';
 import '../../models/issue_model.dart';
+import '../../services/notification_service.dart';
 import '../chatbot/issues_management_screen.dart';
 
 class ChatbotScreen extends StatefulWidget {
@@ -25,7 +27,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
     Future.microtask(() {
       context.read<ChatbotProvider>().loadBotKnowledge();
       _addMessage(
-        'Hello! 👋 I\'m your Chatbot Assistant. I can help you with?\n',
+        'Hello! 👋 I\'m your Chatbot Assistant. How can I help you today?',
         isBot: true,
       );
     });
@@ -64,42 +66,12 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
           ),
         ],
       ),
-      // Add FAB for Team Leaders
-      floatingActionButton: auth.isTeamLeader
-          ? Consumer<ChatbotProvider>(
-              builder: (context, provider, child) {
-                return StreamBuilder<int>(
-                  stream: provider.getPendingIssuesCount(),
-                  builder: (context, snapshot) {
-                    final count = snapshot.data ?? 0;
-
-                    return FloatingActionButton.extended(
-                      onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const IssuesManagementScreen(),
-                          ),
-                        );
-                      },
-                      icon: Badge(
-                        label: Text('$count'),
-                        isLabelVisible: count > 0,
-                        child: const Icon(Icons.question_answer),
-                      ),
-                      label: Text(count > 0 ? 'Pending Issues' : 'Issues'),
-                      backgroundColor:
-                          count > 0 ? Colors.red : const Color(0xFF10B981),
-                    );
-                  },
-                );
-              },
-            )
-          : null,
     );
   }
 
   Widget _buildHeader() {
+    final auth = context.watch<AuthProvider>();
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -143,7 +115,7 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
                   ),
                 ),
                 Text(
-                  'Get Your Answers Instantly !',
+                  'Get Your Answers Instantly!',
                   style: TextStyle(
                     fontSize: 12,
                     color: Color(0xFF64748B),
@@ -152,6 +124,63 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
               ],
             ),
           ),
+          // Issues button for team leaders/admins
+          if (auth.isTeamLeader)
+            Consumer<ChatbotProvider>(
+              builder: (context, provider, child) {
+                return StreamBuilder<int>(
+                  stream: provider.getPendingIssuesCount(),
+                  builder: (context, snapshot) {
+                    final count = snapshot.data ?? 0;
+
+                    return Stack(
+                      children: [
+                        IconButton(
+                          onPressed: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const IssuesManagementScreen(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.assignment_outlined,
+                            color: Color(0xFF1E293B),
+                          ),
+                          tooltip: 'Pending Issues',
+                        ),
+                        if (count > 0)
+                          Positioned(
+                            right: 8,
+                            top: 8,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: const BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: const BoxConstraints(
+                                minWidth: 18,
+                                minHeight: 18,
+                              ),
+                              child: Text(
+                                count > 9 ? '9+' : '$count',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                      ],
+                    );
+                  },
+                );
+              },
+            ),
           Container(
             width: 8,
             height: 8,
@@ -297,25 +326,33 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         isBot: true,
       );
     } else {
+      // No match found - Forward to admin/team leaders
       _addMessage(
-        'I don\'t have an answer for that specific question. 🤔\n\n'
-        'Let me forward this to a team leader who can help you better!',
+        'Sorry, I don\'t know the answer to this yet. 😔',
         isBot: true,
       );
 
-      // Create issue
+      // Create issue - Forward to admin and team leaders
       final auth = context.read<AuthProvider>();
       final issue = IssueModel(
         id: DateTime.now().millisecondsSinceEpoch.toString(),
         userId: auth.currentUser!.uid,
         userName: auth.currentUser!.displayName ?? auth.currentUser!.username,
         question: userMessage,
+        botResponse: null,
         status: 'pending',
+        teamLeaderResponse: null,
+        teamLeaderId: null,
         createdAt: DateTime.now(),
+        resolvedAt: null,
       );
 
       try {
         await botProvider.createIssue(issue);
+        debugPrint('✅ Issue created and forwarded to admins/team leaders');
+
+        // Send notifications to admin and team leaders
+        await _sendIssueNotifications(issue);
 
         await Future.delayed(const Duration(milliseconds: 400));
         setState(() => _isTyping = true);
@@ -323,17 +360,64 @@ class _ChatbotScreenState extends State<ChatbotScreen> {
         setState(() => _isTyping = false);
 
         _addMessage(
-          '✅ Your question has been forwarded to our team leaders.\n\n'
+          'But ✅ Your question has been forwarded to our team leaders.\n\n'
           'They will review it and add the answer to my knowledge base. '
           'You can ask me again later! 🎯',
           isBot: true,
         );
       } catch (e) {
+        debugPrint('❌ Error creating issue: $e');
         _addMessage(
           '❌ Sorry, I couldn\'t forward your question. Please try again or contact support directly.',
           isBot: true,
         );
       }
+    }
+  }
+
+  Future<void> _sendIssueNotifications(IssueModel issue) async {
+    try {
+      // Get all admins and team leaders from Firestore
+      final usersSnapshot = await FirebaseFirestore.instance
+          .collection('users')
+          .where('role', whereIn: ['admin', 'team_leader']).get();
+
+      final recipientIds = usersSnapshot.docs.map((doc) => doc.id).toList();
+
+      if (recipientIds.isEmpty) {
+        debugPrint('⚠️ No admins or team leaders found to notify');
+        return;
+      }
+
+      // Get FCM tokens for recipients
+      List<String> tokens = [];
+      for (String userId in recipientIds) {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .get();
+
+        if (doc.exists) {
+          final data = doc.data();
+          String? token = data?['fcmToken'];
+          if (token != null && token.isNotEmpty) {
+            tokens.add(token);
+          }
+        }
+      }
+
+      debugPrint(
+          '✅ Found ${recipientIds.length} admins/team leaders, ${tokens.length} with FCM tokens');
+
+      // Note: In production, you would call your backend API here to send FCM notifications
+      // For now, we'll just log the notification details
+      debugPrint('📤 Would send notification:');
+      debugPrint('   Title: New Question from ${issue.userName}');
+      debugPrint('   Body: ${issue.question}');
+      debugPrint('   Recipients: ${recipientIds.length}');
+    } catch (e) {
+      debugPrint('⚠️ Error sending notifications: $e');
+      // Don't throw - notification failure shouldn't break the flow
     }
   }
 
