@@ -568,7 +568,7 @@ class _TeamCard extends StatelessWidget {
                         ),
                         const SizedBox(width: 4),
                         Text(
-                          '${team.memberIds.length + 1} members',
+                          '${team.memberIds.length} members',
                           style: TextStyle(
                             fontSize: 12,
                             color: Colors.grey[500],

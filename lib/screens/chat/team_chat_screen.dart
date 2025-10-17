@@ -1,3 +1,4 @@
+// lib/screens/chat/team_chat_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -55,12 +56,7 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
     final isLeader =
         auth.isAdmin || _currentTeam.leaderId == auth.currentUser?.uid;
 
-    // Calculate exact member count (leader + members, avoiding duplicates)
-    final uniqueMemberIds = <String>{
-      _currentTeam.leaderId,
-      ..._currentTeam.memberIds,
-    };
-    final exactMemberCount = uniqueMemberIds.length;
+    final exactMemberCount = _currentTeam.memberIds.length;
 
     if (!isMember) {
       return Scaffold(
@@ -102,12 +98,13 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
           ],
         ),
         actions: [
+          // View Members Button
           IconButton(
             icon: const Icon(Icons.people),
             onPressed: () => _showViewMembersDialog(context),
             tooltip: 'View Members',
           ),
-          // Add Members button for team leaders
+          // FIXED: Add Members button - now visible for team leaders
           if (isLeader)
             IconButton(
               icon: const Icon(Icons.person_add),
@@ -262,12 +259,8 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
   }
 
   void _showTeamInfoDialog(BuildContext context) {
-    // Calculate exact member count
-    final uniqueMemberIds = <String>{
-      _currentTeam.leaderId,
-      ..._currentTeam.memberIds,
-    };
-    final exactMemberCount = uniqueMemberIds.length;
+    // FIXED: Simple calculation
+    final exactMemberCount = _currentTeam.memberIds.length;
 
     showDialog(
       context: context,
@@ -377,54 +370,7 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
   }
 }
 
-class _InfoRow extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _InfoRow({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Icon(icon, size: 20, color: const Color(0xFF64748B)),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey[600],
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                value,
-                style: const TextStyle(
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// Keep all your existing classes: _ViewMembersSheet, _MemberCard, _AddMembersSheet,
-// _DateSeparator, _MessageBubble, _MessageInput
-
+// FIXED: View Members Sheet with correct counting
 class _ViewMembersSheet extends StatefulWidget {
   final TeamModel team;
   final ScrollController scrollController;
@@ -446,41 +392,60 @@ class _ViewMembersSheetState extends State<_ViewMembersSheet> {
 
   Future<void> _loadMembers() async {
     try {
+      debugPrint('📥 Loading team members...');
+
+      // Load leader
       final leaderDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(widget.team.leaderId)
           .get();
       if (leaderDoc.exists) {
         _leader = UserModel.fromMap(leaderDoc.data()!, leaderDoc.id);
+        debugPrint('✅ Loaded leader: ${_leader?.username}');
       }
+
+      // Load members (memberIds should NOT include the leader)
       final membersList = <UserModel>[];
+      debugPrint(
+          '📋 Loading ${widget.team.memberIds.length} members from memberIds...');
+
       for (String memberId in widget.team.memberIds) {
+        // Defensive: Skip if this ID is somehow the leader
+        if (memberId == widget.team.leaderId) {
+          debugPrint('⚠️ Warning: Leader ID found in memberIds, skipping');
+          continue;
+        }
+
         final memberDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(memberId)
             .get();
         if (memberDoc.exists) {
-          membersList.add(UserModel.fromMap(memberDoc.data()!, memberDoc.id));
+          final member = UserModel.fromMap(memberDoc.data()!, memberDoc.id);
+          membersList.add(member);
+          debugPrint('✅ Loaded member: ${member.username}');
+        } else {
+          debugPrint('⚠️ User not found: $memberId');
         }
       }
+
       setState(() {
         _members = membersList;
         _isLoading = false;
       });
+
+      debugPrint(
+          '✅ Total loaded: 1 leader + ${_members.length} members = ${1 + _members.length}');
     } catch (e) {
-      debugPrint('Error loading members: $e');
+      debugPrint('❌ Error loading members: $e');
       setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Calculate exact member count
-    final uniqueMemberIds = <String>{
-      widget.team.leaderId,
-      ...widget.team.memberIds,
-    };
-    final exactMemberCount = uniqueMemberIds.length;
+    // FIXED: Simple calculation
+    final exactMemberCount = widget.team.memberIds.length;
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -538,9 +503,20 @@ class _ViewMembersSheetState extends State<_ViewMembersSheet> {
                         Center(
                           child: Padding(
                             padding: const EdgeInsets.all(32),
-                            child: Text('No other members yet',
-                                style: TextStyle(
-                                    color: Colors.grey[600], fontSize: 14)),
+                            child: Column(
+                              children: [
+                                Icon(Icons.group_add,
+                                    size: 60, color: Colors.grey[400]),
+                                const SizedBox(height: 16),
+                                Text('No other members yet',
+                                    style: TextStyle(
+                                        color: Colors.grey[600], fontSize: 14)),
+                                const SizedBox(height: 8),
+                                Text('Tap "Add Members" to invite people',
+                                    style: TextStyle(
+                                        color: Colors.grey[500], fontSize: 12)),
+                              ],
+                            ),
                           ),
                         ),
                     ],
@@ -627,6 +603,7 @@ class _MemberCard extends StatelessWidget {
   }
 }
 
+// FIXED: Add Members Sheet with proper validation
 class _AddMembersSheet extends StatefulWidget {
   final TeamModel team;
   final ScrollController scrollController;
@@ -657,13 +634,19 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
       debugPrint('📥 Loading available users...');
       final snapshot =
           await FirebaseFirestore.instance.collection('users').get();
+
+      // FIXED: Filter out leader AND existing members
       final users = snapshot.docs
           .map((doc) => UserModel.fromMap(doc.data(), doc.id))
           .where((user) =>
               user.uid != widget.team.leaderId &&
               !widget.team.memberIds.contains(user.uid))
           .toList();
+
       debugPrint('✅ Found ${users.length} available users to add');
+      debugPrint(
+          '   (Filtered out: leader + ${widget.team.memberIds.length} existing members)');
+
       setState(() {
         _allUsers = users;
         _filteredUsers = users;
@@ -689,10 +672,36 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
 
   Future<void> _addSelectedMembers() async {
     if (_selectedUserIds.isEmpty) return;
+
     try {
       debugPrint('➕ Adding ${_selectedUserIds.length} members...');
+
+      // Get current memberIds
       final currentMembers = List<String>.from(widget.team.memberIds);
-      currentMembers.addAll(_selectedUserIds);
+
+      // FIXED: Add only new members (avoid duplicates and don't add leader)
+      final newMembers = _selectedUserIds
+          .where((id) =>
+              !currentMembers.contains(id) && id != widget.team.leaderId)
+          .toList();
+
+      if (newMembers.isEmpty) {
+        debugPrint('⚠️ No new members to add (duplicates filtered)');
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Selected users are already members'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
+
+      currentMembers.addAll(newMembers);
+
+      // Update Firestore
       await FirebaseFirestore.instance
           .collection('teams')
           .doc(widget.team.id)
@@ -700,8 +709,12 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
         'memberIds': currentMembers,
         'updatedAt': DateTime.now().toIso8601String(),
       });
-      debugPrint('✅ Members added successfully');
+
+      debugPrint('✅ Successfully added ${newMembers.length} members');
+      debugPrint('   New total: 1 leader + ${currentMembers.length} members');
+
       widget.onMembersAdded();
+
       if (mounted) {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -712,7 +725,7 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
                 const SizedBox(width: 12),
                 Expanded(
                     child: Text(
-                        '${_selectedUserIds.length} member(s) added successfully')),
+                        '${newMembers.length} member(s) added successfully')),
               ],
             ),
             backgroundColor: Colors.green,
@@ -885,6 +898,51 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+}
+
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: const Color(0xFF64748B)),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey[600],
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: const TextStyle(
+                  fontSize: 14,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 

@@ -118,8 +118,7 @@ class TeamModel {
     );
   }
 
-  // Helper methods
-  int get totalMembers => memberIds.length + 1; // +1 for leader
+  int get totalMembers => memberIds.length;
 
   bool isUserMember(String userId) {
     return leaderId == userId || memberIds.contains(userId);
