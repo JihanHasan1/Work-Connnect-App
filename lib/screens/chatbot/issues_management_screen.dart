@@ -76,7 +76,6 @@ class _IssuesManagementScreenState extends State<IssuesManagementScreen>
       ),
       body: Column(
         children: [
-          // Search Bar
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
@@ -105,8 +104,6 @@ class _IssuesManagementScreenState extends State<IssuesManagementScreen>
               ),
             ),
           ),
-
-          // Tab Content
           Expanded(
             child: TabBarView(
               controller: _tabController,
@@ -252,8 +249,15 @@ class _IssuesManagementScreenState extends State<IssuesManagementScreen>
 
   void _showResolveDialog(IssueModel issue) {
     final responseController = TextEditingController();
+    final keywordsController = TextEditingController();
     bool saveToKnowledge = true;
+    bool autoExtract = true;
     final formKey = GlobalKey<FormState>();
+
+    // Auto-extract keywords from question
+    final chatbotProvider = context.read<ChatbotProvider>();
+    final extractedKeywords = chatbotProvider.extractKeywords(issue.question);
+    keywordsController.text = extractedKeywords.join(', ');
 
     showDialog(
       context: context,
@@ -345,6 +349,7 @@ class _IssuesManagementScreenState extends State<IssuesManagementScreen>
                       hintText: 'Provide a helpful answer...',
                       border: OutlineInputBorder(),
                       alignLabelWithHint: true,
+                      prefixIcon: Icon(Icons.chat_bubble_outline),
                     ),
                     maxLines: 5,
                     validator: (value) {
@@ -367,7 +372,8 @@ class _IssuesManagementScreenState extends State<IssuesManagementScreen>
                     },
                     title: const Text(
                       'Add to Chatbot Knowledge',
-                      style: TextStyle(fontSize: 14),
+                      style:
+                          TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
                     ),
                     subtitle: const Text(
                       'The chatbot will use this answer for similar questions',
@@ -375,6 +381,62 @@ class _IssuesManagementScreenState extends State<IssuesManagementScreen>
                     ),
                     contentPadding: EdgeInsets.zero,
                   ),
+
+                  // Keywords Input (only show if saving to knowledge)
+                  if (saveToKnowledge) ...[
+                    const SizedBox(height: 8),
+                    TextFormField(
+                      controller: keywordsController,
+                      decoration: InputDecoration(
+                        labelText: 'Keywords (comma separated)',
+                        hintText: 'leave, policy, vacation',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.label),
+                        helperText: 'Keywords help match similar questions',
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.auto_awesome),
+                          tooltip: 'Auto-extract keywords',
+                          onPressed: () {
+                            final keywords =
+                                chatbotProvider.extractKeywords(issue.question);
+                            keywordsController.text = keywords.join(', ');
+                          },
+                        ),
+                      ),
+                      maxLines: 2,
+                      validator: (value) {
+                        if (saveToKnowledge &&
+                            (value == null || value.isEmpty)) {
+                          return 'Please enter at least one keyword';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 8),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.tips_and_updates,
+                              color: Color(0xFF10B981), size: 16),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              'Add important words from the question as keywords. This helps the bot match similar questions.',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[700],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -391,12 +453,22 @@ class _IssuesManagementScreenState extends State<IssuesManagementScreen>
                     final auth = context.read<AuthProvider>();
                     final chatbotProvider = context.read<ChatbotProvider>();
 
+                    List<String>? keywords;
+                    if (saveToKnowledge) {
+                      keywords = keywordsController.text
+                          .split(',')
+                          .map((k) => k.trim())
+                          .where((k) => k.isNotEmpty)
+                          .toList();
+                    }
+
                     await chatbotProvider.resolveIssue(
                       issue.id,
                       responseController.text.trim(),
                       auth.currentUser!.uid,
                       saveToKnowledge,
                       saveToKnowledge ? issue.question : null,
+                      keywords,
                     );
 
                     if (dialogContext.mounted) {
@@ -411,7 +483,7 @@ class _IssuesManagementScreenState extends State<IssuesManagementScreen>
                               Expanded(
                                 child: Text(
                                   saveToKnowledge
-                                      ? 'Issue resolved and added to chatbot!'
+                                      ? 'Issue resolved and added to chatbot with ${keywords?.length ?? 0} keywords!'
                                       : 'Issue resolved!',
                                 ),
                               ),

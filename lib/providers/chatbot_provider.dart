@@ -6,11 +6,12 @@ import '../models/faq_model.dart';
 class ChatbotProvider extends ChangeNotifier {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  Map<String, String> _botKnowledge = {};
+  // Structure: { questionId: { question, answer, keywords: [keyword1, keyword2, ...] } }
+  Map<String, Map<String, dynamic>> _botKnowledge = {};
   List<FAQModel> _faqs = [];
   bool _isLoading = false;
 
-  Map<String, String> get botKnowledge => _botKnowledge;
+  Map<String, Map<String, dynamic>> get botKnowledge => _botKnowledge;
   bool get isLoading => _isLoading;
 
   // Load both chatbot knowledge and FAQs
@@ -19,11 +20,17 @@ class ChatbotProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Load chatbot responses
+      // Load chatbot knowledge with keywords
       final doc = await _firestore.collection('chatbot').doc('knowledge').get();
       if (doc.exists) {
-        _botKnowledge =
-            Map<String, String>.from(doc.data()?['responses'] ?? {});
+        final data = doc.data()?['responses'] ?? {};
+        _botKnowledge = Map<String, Map<String, dynamic>>.from(
+          data.map((key, value) => MapEntry(
+                key,
+                Map<String, dynamic>.from(value),
+              )),
+        );
+        debugPrint('✅ Loaded ${_botKnowledge.length} chatbot responses');
       }
 
       // Load FAQs for chatbot use
@@ -31,6 +38,7 @@ class ChatbotProvider extends ChangeNotifier {
       _faqs = faqSnapshot.docs
           .map((doc) => FAQModel.fromMap(doc.data(), doc.id))
           .toList();
+      debugPrint('✅ Loaded ${_faqs.length} FAQs');
     } catch (e) {
       debugPrint('❌ Load bot knowledge error: $e');
     }
@@ -39,13 +47,37 @@ class ChatbotProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> addBotResponse(String question, String answer) async {
+  // Add bot response with keywords
+  Future<void> addBotResponse(
+    String question,
+    String answer,
+    List<String> keywords,
+  ) async {
     try {
-      _botKnowledge[question.toLowerCase().trim()] = answer;
+      final questionId = DateTime.now().millisecondsSinceEpoch.toString();
+
+      // Clean and prepare keywords
+      final cleanKeywords = keywords
+          .map((k) => k.toLowerCase().trim())
+          .where((k) => k.isNotEmpty)
+          .toSet()
+          .toList();
+
+      debugPrint('➕ Adding response with ${cleanKeywords.length} keywords');
+
+      _botKnowledge[questionId] = {
+        'question': question.trim(),
+        'answer': answer.trim(),
+        'keywords': cleanKeywords,
+        'createdAt': DateTime.now().toIso8601String(),
+      };
+
       await _firestore.collection('chatbot').doc('knowledge').set({
         'responses': _botKnowledge,
         'updatedAt': DateTime.now().toIso8601String(),
       });
+
+      debugPrint('✅ Response added successfully');
       notifyListeners();
     } catch (e) {
       debugPrint('❌ Add bot response error: $e');
@@ -53,13 +85,49 @@ class ChatbotProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> removeBotResponse(String question) async {
+  // Update bot response
+  Future<void> updateBotResponse(
+    String questionId,
+    String question,
+    String answer,
+    List<String> keywords,
+  ) async {
     try {
-      _botKnowledge.remove(question.toLowerCase().trim());
+      final cleanKeywords = keywords
+          .map((k) => k.toLowerCase().trim())
+          .where((k) => k.isNotEmpty)
+          .toSet()
+          .toList();
+
+      _botKnowledge[questionId] = {
+        'question': question.trim(),
+        'answer': answer.trim(),
+        'keywords': cleanKeywords,
+        'updatedAt': DateTime.now().toIso8601String(),
+      };
+
       await _firestore.collection('chatbot').doc('knowledge').set({
         'responses': _botKnowledge,
         'updatedAt': DateTime.now().toIso8601String(),
       });
+
+      debugPrint('✅ Response updated successfully');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ Update bot response error: $e');
+      rethrow;
+    }
+  }
+
+  // Remove bot response
+  Future<void> removeBotResponse(String questionId) async {
+    try {
+      _botKnowledge.remove(questionId);
+      await _firestore.collection('chatbot').doc('knowledge').set({
+        'responses': _botKnowledge,
+        'updatedAt': DateTime.now().toIso8601String(),
+      });
+      debugPrint('✅ Response removed successfully');
       notifyListeners();
     } catch (e) {
       debugPrint('❌ Remove bot response error: $e');
@@ -67,133 +135,184 @@ class ChatbotProvider extends ChangeNotifier {
     }
   }
 
-  // Enhanced bot response with FAQ integration and improved fuzzy matching
+  // Enhanced bot response with keyword matching
   String? getBotResponse(String question) {
     final lowerQuestion = question.toLowerCase().trim();
+    debugPrint('\n🤖 Processing question: "$question"');
 
-    // 1. Exact match in chatbot knowledge
-    if (_botKnowledge.containsKey(lowerQuestion)) {
-      debugPrint('✅ Exact match found in chatbot knowledge');
-      return _botKnowledge[lowerQuestion];
-    }
-
-    // 2. Check FAQs for exact match
-    for (var faq in _faqs) {
-      if (faq.question.toLowerCase().trim() == lowerQuestion) {
-        debugPrint('✅ Exact match found in FAQs');
-        return faq.answer;
-      }
-    }
-
-    // 3. Improved fuzzy matching - check for significant keyword overlap
-    // Extract meaningful keywords (words longer than 3 characters)
+    // Extract words from the question (minimum 3 characters)
     final questionWords = lowerQuestion
-        .split(RegExp(r'\s+'))
-        .where((w) => w.length > 3)
+        .split(RegExp(r'[^\w]+'))
+        .where((w) => w.length >= 3)
         .map((w) => w.toLowerCase())
         .toSet();
 
+    debugPrint('📝 Question words: $questionWords');
+
     if (questionWords.isEmpty) {
-      debugPrint('❌ No meaningful keywords found in question');
+      debugPrint('❌ No valid words in question');
       return null;
     }
 
-    // Search in chatbot knowledge with stricter matching
     String? bestMatch;
     double bestScore = 0.0;
+    String? bestQuestionText;
 
+    // Search in chatbot knowledge using keywords
     for (var entry in _botKnowledge.entries) {
-      final knowledgeWords = entry.key
-          .split(RegExp(r'\s+'))
-          .where((w) => w.length > 3)
-          .map((w) => w.toLowerCase())
-          .toSet();
+      final data = entry.value;
+      final keywords = List<String>.from(data['keywords'] ?? []);
+      final storedQuestion = data['question']?.toString().toLowerCase() ?? '';
 
-      if (knowledgeWords.isEmpty) continue;
-
-      // Calculate Jaccard similarity (intersection / union)
-      final intersection = questionWords.intersection(knowledgeWords).length;
-      final union = questionWords.union(knowledgeWords).length;
-      final similarity = intersection / union;
-
-      // Require at least 60% similarity AND at least 2 matching words
-      if (similarity > bestScore && similarity >= 0.6 && intersection >= 2) {
-        bestScore = similarity;
-        bestMatch = entry.value;
-      }
-    }
-
-    if (bestMatch != null) {
-      debugPrint(
-          '✅ Fuzzy match found in chatbot (score: ${(bestScore * 100).toStringAsFixed(1)}%)');
-      return bestMatch;
-    }
-
-    // Search in FAQs with same stricter matching
-    bestMatch = null;
-    bestScore = 0.0;
-
-    for (var faq in _faqs) {
-      final faqWords = faq.question
-          .toLowerCase()
-          .split(RegExp(r'\s+'))
-          .where((w) => w.length > 3)
-          .map((w) => w.toLowerCase())
-          .toSet();
-
-      if (faqWords.isEmpty) continue;
-
-      final intersection = questionWords.intersection(faqWords).length;
-      final union = questionWords.union(faqWords).length;
-      final similarity = intersection / union;
-
-      // Slightly lower threshold for FAQs (50%) but still require 2 matching words
-      if (similarity > bestScore && similarity >= 0.5 && intersection >= 2) {
-        bestScore = similarity;
-        bestMatch = faq.answer;
-      }
-    }
-
-    if (bestMatch != null) {
-      debugPrint(
-          '✅ Fuzzy match found in FAQs (score: ${(bestScore * 100).toStringAsFixed(1)}%)');
-      return bestMatch;
-    }
-
-    // 4. Check for common single keywords only as last resort
-    final commonKeywords = {
-      'leave':
-          'For leave-related queries, please check the Leave Policy in FAQs or contact HR.',
-      'salary':
-          'For salary-related queries, please contact the HR department directly.',
-      'pay':
-          'For payment-related queries, please contact the HR department directly.',
-      'password':
-          'For password reset, please contact IT support or use the password reset link.',
-      'login':
-          'For login issues, please contact IT support or check your credentials.',
-      'benefits':
-          'For information about benefits, please check the Employee Benefits section in FAQs.',
-      'holiday':
-          'For holiday schedules, please check the Company Calendar in FAQs.',
-      'vacation':
-          'For vacation policies, please check the Leave Policy in FAQs.',
-      'sick':
-          'For sick leave information, please check the Leave Policy in FAQs or contact HR.',
-    };
-
-    // Only check single keywords if the question is very short (4 words or less)
-    if (lowerQuestion.split(RegExp(r'\s+')).length <= 4) {
-      for (var keyword in commonKeywords.keys) {
-        if (lowerQuestion.contains(keyword)) {
-          debugPrint('✅ Single keyword match found: $keyword');
-          return commonKeywords[keyword];
+      // Calculate keyword match score
+      int keywordMatches = 0;
+      for (var word in questionWords) {
+        if (keywords.contains(word)) {
+          keywordMatches++;
         }
       }
+
+      // Calculate question similarity score
+      final questionWordsInStored = storedQuestion
+          .split(RegExp(r'[^\w]+'))
+          .where((w) => w.length >= 3)
+          .toSet();
+
+      final wordMatches =
+          questionWords.intersection(questionWordsInStored).length;
+
+      // Combined score: keyword matches are weighted more heavily
+      final score = (keywordMatches * 2.0) + (wordMatches * 1.0);
+
+      debugPrint('  Checking: "${data['question']}"');
+      debugPrint('    Keywords: $keywords');
+      debugPrint('    Keyword matches: $keywordMatches');
+      debugPrint('    Word matches: $wordMatches');
+      debugPrint('    Score: $score');
+
+      // Require at least 1 keyword match OR 2 word matches
+      if (score > bestScore && (keywordMatches >= 1 || wordMatches >= 2)) {
+        bestScore = score;
+        bestMatch = data['answer'];
+        bestQuestionText = data['question'];
+      }
     }
 
-    debugPrint('❌ No match found for: $question');
+    if (bestMatch != null) {
+      debugPrint('✅ Found match with score $bestScore: "$bestQuestionText"');
+      return bestMatch;
+    }
+
+    // Search in FAQs with keywords
+    for (var faq in _faqs) {
+      final faqQuestion = faq.question.toLowerCase();
+      final faqWords = faqQuestion
+          .split(RegExp(r'[^\w]+'))
+          .where((w) => w.length >= 3)
+          .toSet();
+
+      final wordMatches = questionWords.intersection(faqWords).length;
+      final score = wordMatches.toDouble();
+
+      debugPrint('  Checking FAQ: "${faq.question}"');
+      debugPrint('    Word matches: $wordMatches');
+      debugPrint('    Score: $score');
+
+      if (score > bestScore && wordMatches >= 2) {
+        bestScore = score;
+        bestMatch = faq.answer;
+        bestQuestionText = faq.question;
+      }
+    }
+
+    if (bestMatch != null) {
+      debugPrint(
+          '✅ Found FAQ match with score $bestScore: "$bestQuestionText"');
+      return bestMatch;
+    }
+
+    debugPrint('❌ No match found');
     return null;
+  }
+
+  // Auto-extract keywords from question (helper method)
+  List<String> extractKeywords(String question) {
+    // Common words to ignore
+    final stopWords = {
+      'the',
+      'a',
+      'an',
+      'and',
+      'or',
+      'but',
+      'in',
+      'on',
+      'at',
+      'to',
+      'for',
+      'of',
+      'with',
+      'by',
+      'from',
+      'as',
+      'is',
+      'was',
+      'are',
+      'were',
+      'be',
+      'been',
+      'being',
+      'have',
+      'has',
+      'had',
+      'do',
+      'does',
+      'did',
+      'will',
+      'would',
+      'should',
+      'could',
+      'can',
+      'may',
+      'might',
+      'what',
+      'when',
+      'where',
+      'who',
+      'how',
+      'why',
+      'which',
+      'this',
+      'that',
+      'these',
+      'those',
+      'i',
+      'you',
+      'he',
+      'she',
+      'it',
+      'we',
+      'they',
+      'my',
+      'your',
+      'his',
+      'her',
+      'our',
+      'their',
+      'me',
+      'him',
+      'us',
+      'them'
+    };
+
+    final words = question
+        .toLowerCase()
+        .split(RegExp(r'[^\w]+'))
+        .where((w) => w.length >= 3 && !stopWords.contains(w))
+        .toSet()
+        .toList();
+
+    return words;
   }
 
   // Create an issue when chatbot can't answer
@@ -235,13 +354,14 @@ class ChatbotProvider extends ChangeNotifier {
     });
   }
 
-  // Resolve issue with a response
+  // Resolve issue with a response and keywords
   Future<void> resolveIssue(
     String issueId,
     String response,
     String teamLeaderId,
     bool saveToKnowledge,
     String? question,
+    List<String>? keywords,
   ) async {
     try {
       // Update issue status
@@ -252,9 +372,11 @@ class ChatbotProvider extends ChangeNotifier {
         'resolvedAt': DateTime.now().toIso8601String(),
       });
 
-      // Optionally add to chatbot knowledge
+      // Optionally add to chatbot knowledge with keywords
       if (saveToKnowledge && question != null) {
-        await addBotResponse(question, response);
+        final finalKeywords = keywords ?? extractKeywords(question);
+        await addBotResponse(question, response, finalKeywords);
+        debugPrint('✅ Added to knowledge with keywords: $finalKeywords');
       }
 
       debugPrint('✅ Issue resolved: $issueId');

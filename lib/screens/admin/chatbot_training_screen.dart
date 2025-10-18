@@ -2,7 +2,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/chatbot_provider.dart';
-import '../../providers/auth_provider.dart';
 
 class ChatbotTrainingScreen extends StatefulWidget {
   const ChatbotTrainingScreen({Key? key}) : super(key: key);
@@ -48,14 +47,8 @@ class _ChatbotTrainingScreenState extends State<ChatbotTrainingScreen>
         bottom: TabBar(
           controller: _tabController,
           tabs: const [
-            Tab(
-              icon: Icon(Icons.psychology),
-              text: 'Knowledge Base',
-            ),
-            Tab(
-              icon: Icon(Icons.science),
-              text: 'Test Bot',
-            ),
+            Tab(icon: Icon(Icons.psychology), text: 'Knowledge Base'),
+            Tab(icon: Icon(Icons.science), text: 'Test Bot'),
           ],
         ),
       ),
@@ -128,10 +121,8 @@ class _ChatbotTrainingScreenState extends State<ChatbotTrainingScreen>
                       children: [
                         Text(
                           'Total Knowledge Entries',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
+                          style:
+                              TextStyle(fontSize: 12, color: Colors.grey[600]),
                         ),
                         Text(
                           '${provider.botKnowledge.length}',
@@ -145,10 +136,8 @@ class _ChatbotTrainingScreenState extends State<ChatbotTrainingScreen>
                     ),
                   ),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
                       color: const Color(0xFF10B981),
                       borderRadius: BorderRadius.circular(20),
@@ -190,8 +179,14 @@ class _ChatbotTrainingScreenState extends State<ChatbotTrainingScreen>
   Widget _buildKnowledgeList(ChatbotProvider provider) {
     final entries = provider.botKnowledge.entries.where((entry) {
       if (_searchQuery.isEmpty) return true;
-      return entry.key.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-          entry.value.toLowerCase().contains(_searchQuery.toLowerCase());
+      final data = entry.value;
+      final question = data['question']?.toString().toLowerCase() ?? '';
+      final answer = data['answer']?.toString().toLowerCase() ?? '';
+      final keywords = List<String>.from(data['keywords'] ?? []);
+
+      return question.contains(_searchQuery.toLowerCase()) ||
+          answer.contains(_searchQuery.toLowerCase()) ||
+          keywords.any((k) => k.contains(_searchQuery.toLowerCase()));
     }).toList();
 
     if (entries.isEmpty) {
@@ -215,12 +210,21 @@ class _ChatbotTrainingScreenState extends State<ChatbotTrainingScreen>
       itemCount: entries.length,
       itemBuilder: (context, index) {
         final entry = entries[index];
+        final questionId = entry.key;
+        final data = entry.value;
         return _KnowledgeCard(
-          question: entry.key,
-          answer: entry.value,
-          onEdit: () =>
-              _showEditKnowledgeDialog(context, entry.key, entry.value),
-          onDelete: () => _confirmDelete(context, entry.key),
+          questionId: questionId,
+          question: data['question'] ?? '',
+          answer: data['answer'] ?? '',
+          keywords: List<String>.from(data['keywords'] ?? []),
+          onEdit: () => _showEditKnowledgeDialog(
+            context,
+            questionId,
+            data['question'] ?? '',
+            data['answer'] ?? '',
+            List<String>.from(data['keywords'] ?? []),
+          ),
+          onDelete: () => _confirmDelete(context, questionId),
         );
       },
     );
@@ -282,140 +286,221 @@ class _ChatbotTrainingScreenState extends State<ChatbotTrainingScreen>
   void _showAddKnowledgeDialog(BuildContext context) {
     final questionController = TextEditingController();
     final answerController = TextEditingController();
+    final keywordsController = TextEditingController();
     final formKey = GlobalKey<FormState>();
+    bool autoExtract = true;
 
     showDialog(
       context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: const Color(0xFF10B981).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.add_circle, color: Color(0xFF10B981)),
               ),
-              child: const Icon(Icons.add_circle, color: Color(0xFF10B981)),
-            ),
-            const SizedBox(width: 12),
-            const Text('Add Knowledge'),
-          ],
-        ),
-        content: SingleChildScrollView(
-          child: Form(
-            key: formKey,
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Train the chatbot to answer specific questions',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: questionController,
-                  decoration: const InputDecoration(
-                    labelText: 'Question/Trigger',
-                    hintText: 'e.g., What is the leave policy?',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.question_answer),
-                    helperText: 'What users might ask',
+              const SizedBox(width: 12),
+              const Text('Add Knowledge'),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Form(
+              key: formKey,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Train the chatbot to answer specific questions',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
-                  maxLines: 2,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter a question';
-                    }
-                    if (value.length < 5) {
-                      return 'Question must be at least 5 characters';
-                    }
-                    return null;
-                  },
-                  textCapitalization: TextCapitalization.sentences,
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: answerController,
-                  decoration: const InputDecoration(
-                    labelText: 'Bot Response',
-                    hintText: 'The chatbot will respond with this answer',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.chat_bubble_outline),
-                    helperText: 'What the bot should answer',
+                  const SizedBox(height: 16),
+
+                  // Question
+                  TextFormField(
+                    controller: questionController,
+                    decoration: const InputDecoration(
+                      labelText: 'Question/Trigger',
+                      hintText: 'e.g., What is the leave policy?',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.question_answer),
+                      helperText: 'What users might ask',
+                    ),
+                    maxLines: 2,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter a question';
+                      }
+                      if (value.length < 5) {
+                        return 'Question must be at least 5 characters';
+                      }
+                      return null;
+                    },
+                    textCapitalization: TextCapitalization.sentences,
+                    onChanged: (value) {
+                      if (autoExtract && value.isNotEmpty) {
+                        final provider = context.read<ChatbotProvider>();
+                        final keywords = provider.extractKeywords(value);
+                        keywordsController.text = keywords.join(', ');
+                      }
+                    },
                   ),
-                  maxLines: 5,
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Please enter an answer';
-                    }
-                    if (value.length < 10) {
-                      return 'Answer must be at least 10 characters';
-                    }
-                    return null;
-                  },
-                  textCapitalization: TextCapitalization.sentences,
-                ),
-              ],
+                  const SizedBox(height: 16),
+
+                  // Answer
+                  TextFormField(
+                    controller: answerController,
+                    decoration: const InputDecoration(
+                      labelText: 'Bot Response',
+                      hintText: 'The chatbot will respond with this answer',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.chat_bubble_outline),
+                      helperText: 'What the bot should answer',
+                    ),
+                    maxLines: 5,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter an answer';
+                      }
+                      if (value.length < 10) {
+                        return 'Answer must be at least 10 characters';
+                      }
+                      return null;
+                    },
+                    textCapitalization: TextCapitalization.sentences,
+                  ),
+                  const SizedBox(height: 16),
+
+                  // Keywords
+                  TextFormField(
+                    controller: keywordsController,
+                    decoration: InputDecoration(
+                      labelText: 'Keywords (comma separated)',
+                      hintText: 'leave, policy, vacation, holidays',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.label),
+                      helperText: 'Important words for matching questions',
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.auto_awesome),
+                        tooltip: 'Auto-extract keywords',
+                        onPressed: () {
+                          if (questionController.text.isNotEmpty) {
+                            final provider = context.read<ChatbotProvider>();
+                            final keywords = provider
+                                .extractKeywords(questionController.text);
+                            keywordsController.text = keywords.join(', ');
+                          }
+                        },
+                      ),
+                    ),
+                    maxLines: 2,
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return 'Please enter at least one keyword';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+
+                  // Auto-extract checkbox
+                  CheckboxListTile(
+                    value: autoExtract,
+                    onChanged: (value) {
+                      setState(() => autoExtract = value ?? true);
+                    },
+                    title: const Text(
+                      'Auto-extract keywords',
+                      style: TextStyle(fontSize: 14),
+                    ),
+                    subtitle: const Text(
+                      'Automatically extract keywords from question',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                    contentPadding: EdgeInsets.zero,
+                    dense: true,
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              if (formKey.currentState!.validate()) {
-                try {
-                  await context.read<ChatbotProvider>().addBotResponse(
-                        questionController.text.trim(),
-                        answerController.text.trim(),
-                      );
-                  if (dialogContext.mounted) {
-                    Navigator.pop(dialogContext);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Row(
-                          children: [
-                            Icon(Icons.check_circle, color: Colors.white),
-                            SizedBox(width: 12),
-                            Text('Knowledge added successfully!'),
-                          ],
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (formKey.currentState!.validate()) {
+                  try {
+                    final keywords = keywordsController.text
+                        .split(',')
+                        .map((k) => k.trim())
+                        .where((k) => k.isNotEmpty)
+                        .toList();
+
+                    await context.read<ChatbotProvider>().addBotResponse(
+                          questionController.text.trim(),
+                          answerController.text.trim(),
+                          keywords,
+                        );
+
+                    if (dialogContext.mounted) {
+                      Navigator.pop(dialogContext);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Row(
+                            children: [
+                              Icon(Icons.check_circle, color: Colors.white),
+                              SizedBox(width: 12),
+                              Text('Knowledge added successfully!'),
+                            ],
+                          ),
+                          backgroundColor: Colors.green,
+                          behavior: SnackBarBehavior.floating,
                         ),
-                        backgroundColor: Colors.green,
-                        behavior: SnackBarBehavior.floating,
-                      ),
-                    );
-                  }
-                } catch (e) {
-                  if (dialogContext.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Error: ${e.toString()}'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
+                      );
+                    }
+                  } catch (e) {
+                    if (dialogContext.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('Error: ${e.toString()}'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
                   }
                 }
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF10B981),
-              foregroundColor: Colors.white,
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF10B981),
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Add Knowledge'),
             ),
-            child: const Text('Add Knowledge'),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 
   void _showEditKnowledgeDialog(
-      BuildContext context, String oldQuestion, String oldAnswer) {
+    BuildContext context,
+    String questionId,
+    String oldQuestion,
+    String oldAnswer,
+    List<String> oldKeywords,
+  ) {
     final questionController = TextEditingController(text: oldQuestion);
     final answerController = TextEditingController(text: oldAnswer);
+    final keywordsController =
+        TextEditingController(text: oldKeywords.join(', '));
     final formKey = GlobalKey<FormState>();
 
     showDialog(
@@ -472,6 +557,34 @@ class _ChatbotTrainingScreenState extends State<ChatbotTrainingScreen>
                     return null;
                   },
                 ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: keywordsController,
+                  decoration: InputDecoration(
+                    labelText: 'Keywords (comma separated)',
+                    hintText: 'leave, policy, vacation',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.label),
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.auto_awesome),
+                      onPressed: () {
+                        if (questionController.text.isNotEmpty) {
+                          final provider = context.read<ChatbotProvider>();
+                          final keywords =
+                              provider.extractKeywords(questionController.text);
+                          keywordsController.text = keywords.join(', ');
+                        }
+                      },
+                    ),
+                  ),
+                  maxLines: 2,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter at least one keyword';
+                    }
+                    return null;
+                  },
+                ),
               ],
             ),
           ),
@@ -485,14 +598,19 @@ class _ChatbotTrainingScreenState extends State<ChatbotTrainingScreen>
             onPressed: () async {
               if (formKey.currentState!.validate()) {
                 try {
-                  final provider = context.read<ChatbotProvider>();
-                  // Remove old entry
-                  await provider.removeBotResponse(oldQuestion);
-                  // Add new entry
-                  await provider.addBotResponse(
-                    questionController.text.trim(),
-                    answerController.text.trim(),
-                  );
+                  final keywords = keywordsController.text
+                      .split(',')
+                      .map((k) => k.trim())
+                      .where((k) => k.isNotEmpty)
+                      .toList();
+
+                  await context.read<ChatbotProvider>().updateBotResponse(
+                        questionId,
+                        questionController.text.trim(),
+                        answerController.text.trim(),
+                        keywords,
+                      );
+
                   if (dialogContext.mounted) {
                     Navigator.pop(dialogContext);
                     ScaffoldMessenger.of(context).showSnackBar(
@@ -532,7 +650,7 @@ class _ChatbotTrainingScreenState extends State<ChatbotTrainingScreen>
     );
   }
 
-  Future<void> _confirmDelete(BuildContext context, String question) async {
+  Future<void> _confirmDelete(BuildContext context, String questionId) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -543,25 +661,8 @@ class _ChatbotTrainingScreenState extends State<ChatbotTrainingScreen>
             Text('Delete Knowledge'),
           ],
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
+        content:
             const Text('Are you sure you want to delete this knowledge entry?'),
-            const SizedBox(height: 12),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                question,
-                style: const TextStyle(fontStyle: FontStyle.italic),
-              ),
-            ),
-          ],
-        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -578,7 +679,7 @@ class _ChatbotTrainingScreenState extends State<ChatbotTrainingScreen>
 
     if (confirm == true && context.mounted) {
       try {
-        await context.read<ChatbotProvider>().removeBotResponse(question);
+        await context.read<ChatbotProvider>().removeBotResponse(questionId);
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -624,24 +725,24 @@ class _ChatbotTrainingScreenState extends State<ChatbotTrainingScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               _buildGuideSection(
-                '1. Add Knowledge',
-                'Train the bot by adding question-answer pairs. The bot will learn to respond to similar questions.',
+                '1. Add Knowledge with Keywords',
+                'Enter a question, answer, and keywords. Keywords help the bot match similar questions.',
               ),
               _buildGuideSection(
-                '2. Use Clear Questions',
-                'Make questions specific and natural. Example: "What is the leave policy?" instead of just "leave".',
+                '2. Use Effective Keywords',
+                'Choose important words from the question. Example: "leave", "policy", "vacation" for leave-related questions.',
               ),
               _buildGuideSection(
-                '3. Provide Complete Answers',
-                'Give detailed, helpful answers. The bot will use these exact responses.',
+                '3. Auto-Extract Feature',
+                'The bot can automatically extract keywords from your question. You can edit them as needed.',
               ),
               _buildGuideSection(
                 '4. Test Your Bot',
                 'Use the "Test Bot" tab to verify the chatbot understands questions correctly.',
               ),
               _buildGuideSection(
-                '5. Update Regularly',
-                'Keep the knowledge base updated as policies or information changes.',
+                '5. Multiple Keywords',
+                'Add multiple keywords (comma-separated) to improve matching. More keywords = better matching!',
               ),
               const SizedBox(height: 16),
               Container(
@@ -650,15 +751,30 @@ class _ChatbotTrainingScreenState extends State<ChatbotTrainingScreen>
                   color: const Color(0xFF10B981).withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Row(
+                child: const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.tips_and_updates, color: Color(0xFF10B981)),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'Tip: The bot uses smart matching to understand variations of questions!',
-                        style: TextStyle(fontSize: 12),
-                      ),
+                    Row(
+                      children: [
+                        Icon(Icons.tips_and_updates, color: Color(0xFF10B981)),
+                        SizedBox(width: 12),
+                        Text(
+                          'Example:',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 8),
+                    Text('Question: "What is the company leave policy?"'),
+                    SizedBox(height: 4),
+                    Text('Keywords: leave, policy, vacation, holidays, days'),
+                    SizedBox(height: 8),
+                    Text(
+                      'Now the bot will match questions like:\n'
+                      '• "How many leave days do I have?"\n'
+                      '• "Tell me about vacation policy"\n'
+                      '• "What\'s the holiday policy?"',
+                      style: TextStyle(fontSize: 12),
                     ),
                   ],
                 ),
@@ -702,14 +818,18 @@ class _ChatbotTrainingScreenState extends State<ChatbotTrainingScreen>
 }
 
 class _KnowledgeCard extends StatefulWidget {
+  final String questionId;
   final String question;
   final String answer;
+  final List<String> keywords;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
   const _KnowledgeCard({
+    required this.questionId,
     required this.question,
     required this.answer,
+    required this.keywords,
     required this.onEdit,
     required this.onDelete,
   });
@@ -758,18 +878,53 @@ class _KnowledgeCardState extends State<_KnowledgeCard> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (!_isExpanded) ...[
-                          const SizedBox(height: 4),
-                          Text(
-                            widget.answer,
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[600],
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 4,
+                          runSpacing: 4,
+                          children: widget.keywords.take(3).map((keyword) {
+                            return Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF10B981).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(
+                                    Icons.label,
+                                    size: 10,
+                                    color: Color(0xFF10B981),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    keyword,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Color(0xFF10B981),
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                        if (widget.keywords.length > 3)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 4),
+                            child: Text(
+                              '+${widget.keywords.length - 3} more keywords',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey[600],
+                              ),
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
-                        ],
                       ],
                     ),
                   ),
@@ -816,6 +971,54 @@ class _KnowledgeCardState extends State<_KnowledgeCard> {
                       widget.answer,
                       style: TextStyle(fontSize: 14, color: Colors.grey[700]),
                     ),
+                  ),
+                  const SizedBox(height: 12),
+                  const Text(
+                    'All Keywords:',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: widget.keywords.map((keyword) {
+                      return Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF10B981).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: const Color(0xFF10B981).withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(
+                              Icons.label,
+                              size: 12,
+                              color: Color(0xFF10B981),
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              keyword,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF10B981),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
                   ),
                   const SizedBox(height: 12),
                   Row(

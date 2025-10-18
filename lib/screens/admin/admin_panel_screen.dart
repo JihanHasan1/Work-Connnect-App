@@ -1016,14 +1016,14 @@ class _ChatbotTab extends StatelessWidget {
             children: [
               const Expanded(
                 child: Text(
-                  'Train ChatBot',
+                  'ChatBot Knowledge',
                   style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                 ),
               ),
               ElevatedButton.icon(
                 onPressed: () => _showAddResponseDialog(context),
                 icon: const Icon(Icons.add),
-                label: const Text('Add Response'),
+                label: const Text('Add Knowledge'),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF10B981),
                   foregroundColor: Colors.white,
@@ -1041,14 +1041,14 @@ class _ChatbotTab extends StatelessWidget {
                       Icon(Icons.smart_toy_outlined,
                           size: 80, color: Colors.grey[400]),
                       const SizedBox(height: 16),
-                      Text('No responses trained yet',
+                      Text('No knowledge trained yet',
                           style:
                               TextStyle(fontSize: 18, color: Colors.grey[600])),
                       const SizedBox(height: 16),
                       ElevatedButton.icon(
                         onPressed: () => _showAddResponseDialog(context),
                         icon: const Icon(Icons.add),
-                        label: const Text('Add First Response'),
+                        label: const Text('Add First Knowledge'),
                         style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFF10B981)),
                       ),
@@ -1061,8 +1061,14 @@ class _ChatbotTab extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final entry =
                         botProvider.botKnowledge.entries.elementAt(index);
+                    final questionId = entry.key;
+                    final data = entry.value;
                     return _BotResponseCard(
-                        question: entry.key, answer: entry.value);
+                      questionId: questionId,
+                      question: data['question'] ?? '',
+                      answer: data['answer'] ?? '',
+                      keywords: List<String>.from(data['keywords'] ?? []),
+                    );
                   },
                 ),
         ),
@@ -1073,53 +1079,128 @@ class _ChatbotTab extends StatelessWidget {
   static void _showAddResponseDialog(BuildContext context) {
     final questionController = TextEditingController();
     final answerController = TextEditingController();
+    final keywordsController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
 
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Add Bot Response'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: questionController,
-              decoration: const InputDecoration(
-                labelText: 'Question/Keyword',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 2,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Add Bot Knowledge'),
+        content: SingleChildScrollView(
+          child: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextFormField(
+                  controller: questionController,
+                  decoration: const InputDecoration(
+                    labelText: 'Question',
+                    border: OutlineInputBorder(),
+                    hintText: 'What users might ask',
+                  ),
+                  maxLines: 2,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter a question';
+                    }
+                    return null;
+                  },
+                  onChanged: (value) {
+                    if (value.isNotEmpty) {
+                      final provider = context.read<ChatbotProvider>();
+                      final keywords = provider.extractKeywords(value);
+                      keywordsController.text = keywords.join(', ');
+                    }
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: answerController,
+                  decoration: const InputDecoration(
+                    labelText: 'Bot Response',
+                    border: OutlineInputBorder(),
+                    hintText: 'What the bot should answer',
+                  ),
+                  maxLines: 4,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter an answer';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
+                  controller: keywordsController,
+                  decoration: InputDecoration(
+                    labelText: 'Keywords (comma separated)',
+                    border: const OutlineInputBorder(),
+                    hintText: 'leave, policy, vacation',
+                    helperText: 'Important words for matching',
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.auto_awesome),
+                      onPressed: () {
+                        if (questionController.text.isNotEmpty) {
+                          final provider = context.read<ChatbotProvider>();
+                          final keywords =
+                              provider.extractKeywords(questionController.text);
+                          keywordsController.text = keywords.join(', ');
+                        }
+                      },
+                    ),
+                  ),
+                  maxLines: 2,
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Please enter at least one keyword';
+                    }
+                    return null;
+                  },
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: answerController,
-              decoration: const InputDecoration(
-                labelText: 'Bot Response',
-                border: OutlineInputBorder(),
-              ),
-              maxLines: 4,
-            ),
-          ],
+          ),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('Cancel'),
           ),
           ElevatedButton(
             onPressed: () async {
-              if (questionController.text.isNotEmpty &&
-                  answerController.text.isNotEmpty) {
-                await context.read<ChatbotProvider>().addBotResponse(
-                      questionController.text,
-                      answerController.text,
+              if (formKey.currentState!.validate()) {
+                try {
+                  final keywords = keywordsController.text
+                      .split(',')
+                      .map((k) => k.trim())
+                      .where((k) => k.isNotEmpty)
+                      .toList();
+
+                  await context.read<ChatbotProvider>().addBotResponse(
+                        questionController.text.trim(),
+                        answerController.text.trim(),
+                        keywords,
+                      );
+
+                  if (dialogContext.mounted) {
+                    Navigator.pop(dialogContext);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Knowledge added successfully'),
+                        backgroundColor: Colors.green,
+                      ),
                     );
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                        content: Text('Response added successfully'),
-                        backgroundColor: Colors.green),
-                  );
+                  }
+                } catch (e) {
+                  if (dialogContext.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('Error: ${e.toString()}'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
                 }
               }
             },
@@ -1134,10 +1215,17 @@ class _ChatbotTab extends StatelessWidget {
 }
 
 class _BotResponseCard extends StatelessWidget {
+  final String questionId;
   final String question;
   final String answer;
+  final List<String> keywords;
 
-  const _BotResponseCard({required this.question, required this.answer});
+  const _BotResponseCard({
+    required this.questionId,
+    required this.question,
+    required this.answer,
+    required this.keywords,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1154,6 +1242,37 @@ class _BotResponseCard extends StatelessWidget {
         ),
         title:
             Text(question, style: const TextStyle(fontWeight: FontWeight.w600)),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Wrap(
+            spacing: 4,
+            runSpacing: 4,
+            children: keywords.take(3).map((keyword) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF10B981).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.label, size: 10, color: Color(0xFF10B981)),
+                    const SizedBox(width: 4),
+                    Text(
+                      keyword,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: Color(0xFF10B981),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+          ),
+        ),
         children: [
           Container(
             width: double.infinity,
@@ -1177,18 +1296,82 @@ class _BotResponseCard extends StatelessWidget {
                 Text(answer,
                     style: TextStyle(fontSize: 14, color: Colors.grey[700])),
                 const SizedBox(height: 12),
+                const Text('Keywords:',
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF64748B))),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: keywords.map((keyword) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF10B981).withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: const Color(0xFF10B981).withOpacity(0.3),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.label,
+                              size: 12, color: Color(0xFF10B981)),
+                          const SizedBox(width: 4),
+                          Text(
+                            keyword,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF10B981),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 12),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
                     TextButton.icon(
                       onPressed: () async {
-                        await context
-                            .read<ChatbotProvider>()
-                            .removeBotResponse(question);
-                        if (context.mounted) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Response removed')),
-                          );
+                        final confirm = await showDialog<bool>(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Delete Knowledge'),
+                            content: const Text(
+                                'Are you sure you want to delete this knowledge entry?'),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context, false),
+                                child: const Text('Cancel'),
+                              ),
+                              ElevatedButton(
+                                onPressed: () => Navigator.pop(context, true),
+                                style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.red),
+                                child: const Text('Delete'),
+                              ),
+                            ],
+                          ),
+                        );
+
+                        if (confirm == true && context.mounted) {
+                          await context
+                              .read<ChatbotProvider>()
+                              .removeBotResponse(questionId);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text('Knowledge deleted')),
+                            );
+                          }
                         }
                       },
                       icon: const Icon(Icons.delete, size: 18),

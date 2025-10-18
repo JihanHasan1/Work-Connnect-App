@@ -1,4 +1,3 @@
-// lib/screens/chat/team_chat_screen.dart
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -53,8 +52,16 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
         _currentTeam.leaderId == auth.currentUser?.uid ||
         _currentTeam.memberIds.contains(auth.currentUser?.uid);
 
+    // FIXED: isLeader should be true for admins OR the actual team leader
     final isLeader =
         auth.isAdmin || _currentTeam.leaderId == auth.currentUser?.uid;
+
+    // Debug logging
+    debugPrint('👤 Current User ID: ${auth.currentUser?.uid}');
+    debugPrint('👤 Current User Role: ${auth.currentUser?.role}');
+    debugPrint('👥 Team Leader ID: ${_currentTeam.leaderId}');
+    debugPrint('✅ Is Leader: $isLeader');
+    debugPrint('✅ Is Admin: ${auth.isAdmin}');
 
     final exactMemberCount = _currentTeam.memberIds.length;
 
@@ -98,17 +105,21 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
           ],
         ),
         actions: [
-          // View Members Button
+          // View Members Button - visible for all members
           IconButton(
             icon: const Icon(Icons.people),
             onPressed: () => _showViewMembersDialog(context),
             tooltip: 'View Members',
           ),
-          // FIXED: Add Members button - now visible for team leaders
+          // Add Members button - visible for team leaders and admins
           if (isLeader)
             IconButton(
               icon: const Icon(Icons.person_add),
-              onPressed: () => _showAddMembersDialog(context),
+              onPressed: () {
+                debugPrint(
+                    '🎯 Add Members button pressed by ${auth.currentUser?.username}');
+                _showAddMembersDialog(context);
+              },
               tooltip: 'Add Members',
             ),
           // More options menu
@@ -132,6 +143,7 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
                   ],
                 ),
               ),
+              // Add Members also available in menu for team leaders
               if (isLeader)
                 const PopupMenuItem(
                   value: 'add_members',
@@ -259,7 +271,6 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
   }
 
   void _showTeamInfoDialog(BuildContext context) {
-    // FIXED: Simple calculation
     final exactMemberCount = _currentTeam.memberIds.length;
 
     showDialog(
@@ -370,7 +381,9 @@ class _TeamChatScreenState extends State<TeamChatScreen> {
   }
 }
 
-// FIXED: View Members Sheet with correct counting
+// Rest of the helper classes remain the same...
+// (I'll include them for completeness)
+
 class _ViewMembersSheet extends StatefulWidget {
   final TeamModel team;
   final ScrollController scrollController;
@@ -404,13 +417,12 @@ class _ViewMembersSheetState extends State<_ViewMembersSheet> {
         debugPrint('✅ Loaded leader: ${_leader?.username}');
       }
 
-      // Load members (memberIds should NOT include the leader)
+      // Load members
       final membersList = <UserModel>[];
       debugPrint(
           '📋 Loading ${widget.team.memberIds.length} members from memberIds...');
 
       for (String memberId in widget.team.memberIds) {
-        // Defensive: Skip if this ID is somehow the leader
         if (memberId == widget.team.leaderId) {
           debugPrint('⚠️ Warning: Leader ID found in memberIds, skipping');
           continue;
@@ -444,7 +456,6 @@ class _ViewMembersSheetState extends State<_ViewMembersSheet> {
 
   @override
   Widget build(BuildContext context) {
-    // FIXED: Simple calculation
     final exactMemberCount = widget.team.memberIds.length;
 
     return Container(
@@ -603,7 +614,6 @@ class _MemberCard extends StatelessWidget {
   }
 }
 
-// FIXED: Add Members Sheet with proper validation
 class _AddMembersSheet extends StatefulWidget {
   final TeamModel team;
   final ScrollController scrollController;
@@ -635,7 +645,6 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
       final snapshot =
           await FirebaseFirestore.instance.collection('users').get();
 
-      // FIXED: Filter out leader AND existing members
       final users = snapshot.docs
           .map((doc) => UserModel.fromMap(doc.data(), doc.id))
           .where((user) =>
@@ -676,10 +685,7 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
     try {
       debugPrint('➕ Adding ${_selectedUserIds.length} members...');
 
-      // Get current memberIds
       final currentMembers = List<String>.from(widget.team.memberIds);
-
-      // FIXED: Add only new members (avoid duplicates and don't add leader)
       final newMembers = _selectedUserIds
           .where((id) =>
               !currentMembers.contains(id) && id != widget.team.leaderId)
@@ -701,7 +707,6 @@ class _AddMembersSheetState extends State<_AddMembersSheet> {
 
       currentMembers.addAll(newMembers);
 
-      // Update Firestore
       await FirebaseFirestore.instance
           .collection('teams')
           .doc(widget.team.id)
